@@ -38,6 +38,23 @@ let stopRequested = false;
 let selectedItemId = null;
 let currentProcessingId = null;
 
+// ===== 설정 영속화 =====
+const SETTING_IDS = ['engine-select', 'model-select', 'device-select', 'language-select'];
+
+function loadSettings() {
+  SETTING_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    const saved = localStorage.getItem('setting:' + id);
+    if (saved !== null && [...el.options].some(o => o.value === saved)) {
+      el.value = saved;
+    }
+    el.addEventListener('change', () => {
+      localStorage.setItem('setting:' + id, el.value);
+    });
+  });
+}
+loadSettings();
+
 // ===== 설정 토글 =====
 settingsToggle.addEventListener('click', () => {
   settingsPanel.classList.toggle('visible');
@@ -335,6 +352,7 @@ async function startQueue() {
       engine: document.getElementById('engine-select').value,
       model: document.getElementById('model-select').value,
       device: document.getElementById('device-select').value,
+      language: document.getElementById('language-select').value,
     };
 
     try {
@@ -387,7 +405,7 @@ function stopQueue() {
 }
 
 // ===== 진행률 업데이트 =====
-const stageOrder = ['extracting', 'transcribing', 'generating'];
+const stageOrder = ['extracting', 'transcribing', 'aligning', 'generating'];
 
 ipcRenderer.on('processing-progress', (event, data) => {
   const { stage, progress, message } = data;
@@ -483,6 +501,32 @@ newVideoBtn.addEventListener('click', () => {
 const APP_VERSION = require(path.join(__dirname, '..', 'package.json')).version;
 
 const CHANGELOG = [
+  {
+    version: '1.4.0',
+    date: '2026-07-19',
+    sections: [
+      {
+        title: 'Added',
+        type: 'added',
+        items: [
+          'WhisperX 강제 정렬: 단어 단위 정밀 타임스탬프 (한/영/일/중)',
+          '자막 후처리: 무음 구간(0.6초 이상)에서 자막 자동 분할 — 말이 없을 때 자막 미표시',
+          '자막 표시 규칙: 최대 6초, 최소 0.8초, 자동 줄바꿈 (CJK 20자/라틴 42자, 최대 2줄)',
+          '음성 언어 선택 (한국어/영어/일본어/중국어/자동 감지)',
+          '설정값 저장: 마지막 사용 설정이 다음 실행 시 기본값',
+        ],
+      },
+      {
+        title: 'Changed',
+        type: 'changed',
+        items: [
+          '환각(hallucination) 억제: 이전 텍스트 조건화 비활성화 및 품질 임계값 필터 적용',
+          'GPU에서 large-v3를 int8_float16 양자화로 로드 (8GB VRAM 대응)',
+          'VAD 파라미터 튜닝 (최소 무음 500ms, 발화 패딩 200ms)',
+        ],
+      },
+    ],
+  },
   {
     version: '1.3.0',
     date: '2026-03-25',

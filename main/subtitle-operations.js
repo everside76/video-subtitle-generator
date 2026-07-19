@@ -39,6 +39,7 @@ function processVideo(videoPath, options, onProgress, onComplete, onError) {
     '--model', options.model || 'large-v3',
     '--ffmpeg', getFfmpegPath(),
     '--device', options.device || 'auto',
+    '--language', options.language || 'auto',
   ];
 
   if (options.output) {

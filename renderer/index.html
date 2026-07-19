@@ -56,6 +56,16 @@
         <option value="cpu">CPU</option>
       </select>
     </label>
+    <label>
+      음성 언어:
+      <select id="language-select">
+        <option value="ko" selected>한국어</option>
+        <option value="en">영어</option>
+        <option value="ja">일본어</option>
+        <option value="zh">중국어</option>
+        <option value="auto">자동 감지</option>
+      </select>
+    </label>
   </div>
 
   <!-- Main Layout -->
@@ -112,8 +122,12 @@
             <div class="dot">2</div>
             <div class="label">음성<br>인식</div>
           </div>
-          <div class="step" data-stage="generating">
+          <div class="step" data-stage="aligning">
             <div class="dot">3</div>
+            <div class="label">타임스탬프<br>정렬</div>
+          </div>
+          <div class="step" data-stage="generating">
+            <div class="dot">4</div>
             <div class="label">자막<br>생성</div>
           </div>
         </div>
