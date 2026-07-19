@@ -44,6 +44,7 @@ function processVideo(videoPath, options, onProgress, onComplete, onError) {
     '--ffmpeg', getFfmpegPath(),
     '--device', options.device || 'auto',
     '--language', options.language || 'auto',
+    '--align', options.align || 'off',
   ];
 
   if (options.output) {
@@ -88,15 +89,29 @@ function processVideo(videoPath, options, onProgress, onComplete, onError) {
     }
   });
 
-  proc.stderr.on('data', () => {
-    // stderr는 모델 로딩 등의 로그 → 무시
+  // stderr는 진단 로그 파일로 저장하고, 실패 시 마지막 줄을 오류에 포함
+  let stderrTail = '';
+  let logStream = null;
+  try {
+    const { app } = require('electron');
+    logStream = fs.createWriteStream(path.join(app.getPath('userData'), 'engine.log'));
+    logStream.write(`[${new Date().toISOString()}] ${videoPath}\nargs: ${args.join(' ')}\n\n`);
+  } catch { /* 로그 실패는 무시 */ }
+
+  proc.stderr.on('data', (data) => {
+    const text = data.toString('utf-8');
+    stderrTail = (stderrTail + text).slice(-2000);
+    if (logStream) logStream.write(text);
   });
 
   proc.on('close', (code) => {
     currentProcess = null;
+    if (logStream) logStream.end(`\n[exit code: ${code}]\n`);
     // 이미 complete를 받았으면 종료 코드 무시 (CUDA 정리 시 크래시 가능)
     if (!completed && code !== 0 && code !== null) {
-      onError(new Error(`프로세스가 종료되었습니다 (코드: ${code})`));
+      const tail = stderrTail.trim().split('\n').slice(-3).join('\n');
+      onError(new Error(
+        `프로세스가 종료되었습니다 (코드: ${code})${tail ? '\n' + tail : ''}`));
     }
   });
 

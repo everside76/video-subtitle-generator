@@ -39,7 +39,7 @@ let selectedItemId = null;
 let currentProcessingId = null;
 
 // ===== 설정 영속화 =====
-const SETTING_IDS = ['engine-select', 'model-select', 'device-select', 'language-select'];
+const SETTING_IDS = ['engine-select', 'model-select', 'device-select', 'language-select', 'align-select'];
 
 function loadSettings() {
   SETTING_IDS.forEach(id => {
@@ -353,6 +353,7 @@ async function startQueue() {
       model: document.getElementById('model-select').value,
       device: document.getElementById('device-select').value,
       language: document.getElementById('language-select').value,
+      align: document.getElementById('align-select').value,
     };
 
     try {
@@ -501,6 +502,28 @@ newVideoBtn.addEventListener('click', () => {
 const APP_VERSION = require(path.join(__dirname, '..', 'package.json')).version;
 
 const CHANGELOG = [
+  {
+    version: '1.6.0',
+    date: '2026-07-19',
+    sections: [
+      {
+        title: 'Changed',
+        type: 'changed',
+        items: [
+          '무음 자막 제거를 Whisper 단어 타임스탬프 + 후처리만으로 처리 (WhisperX 정렬 기본 비활성화 — GPU 메모리 오류 해소)',
+          '정밀 정렬(WhisperX)은 설정에서 선택 시에만 사용',
+          '음성 인식도 GPU 실패 시 CPU로 자동 재시도',
+        ],
+      },
+      {
+        title: 'Added',
+        type: 'added',
+        items: [
+          '엔진 오류 로그 저장 (engine.log) 및 실패 시 실제 오류 내용 표시',
+        ],
+      },
+    ],
+  },
   {
     version: '1.5.3',
     date: '2026-07-19',

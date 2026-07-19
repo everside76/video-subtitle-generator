@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.6.0] - 2026-07-19
+
+### Changed
+- 무음 자막 제거를 Whisper 단어 타임스탬프 + 후처리만으로 처리 (WhisperX 정렬 기본 비활성화)
+- 정밀 정렬(WhisperX)은 설정에서 "자동" 선택 시에만 사용 (--align 인자)
+- 음성 인식 GPU 실패 시 CPU 자동 재시도
+
+### Added
+- 엔진 stderr를 engine.log로 저장, 프로세스 실패 시 마지막 오류 줄을 UI에 표시
+
 ## [1.5.3] - 2026-07-19
 
 ### Fixed

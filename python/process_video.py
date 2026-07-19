@@ -170,10 +170,22 @@ def transcribe_audio(audio_path, model_size="base", device="auto",
 
 
 def _transcribe_faster(audio_path, model_size="base", device="auto", language="auto"):
-    """faster-whisper (CTranslate2) 엔진으로 음성 인식"""
-    global _whisper_model
-
+    """faster-whisper 인식. GPU 실패(OOM 등) 시 CPU로 자동 재시도."""
     actual_device, compute_type = detect_device(device)
+    try:
+        return _transcribe_faster_impl(
+            audio_path, model_size, actual_device, compute_type, language)
+    except Exception as e:
+        if actual_device != "cuda":
+            raise
+        _unload_whisper_vram()
+        report("warning", 20,
+               f"GPU 인식 실패({type(e).__name__}) — CPU로 재시도합니다 (느려질 수 있음)")
+        return _transcribe_faster_impl(audio_path, model_size, "cpu", "int8", language)
+
+
+def _transcribe_faster_impl(audio_path, model_size, actual_device, compute_type, language):
+    global _whisper_model
 
     device_label = "GPU (CUDA)" if actual_device == "cuda" else "CPU"
     report("transcribing", 20,
@@ -359,6 +371,9 @@ def main():
     parser.add_argument("--language", default="auto",
                         choices=["auto", "ko", "en", "ja", "zh"],
                         help="음성 언어 (auto=자동 감지)")
+    parser.add_argument("--align", default="off",
+                        choices=["auto", "off"],
+                        help="WhisperX 정밀 정렬 (off=Whisper 단어 타임스탬프 사용, 기본)")
     args = parser.parse_args()
 
     # 번들된 ffmpeg 경로를 전역으로 설정
@@ -407,12 +422,15 @@ def main():
             report("error", 0, "음성이 감지되지 않았습니다.")
             sys.exit(1)
 
-        # 3. 강제 정렬 (실패 시 Whisper 단어 타임스탬프로 폴백)
+        # 3. 강제 정렬 (옵션, 실패 시 Whisper 단어 타임스탬프로 폴백)
         align_lang = args.language if args.language != "auto" else detected_lang
-        _unload_whisper_vram()
-        segments, aligned = align_with_whisperx(
-            segments, audio_path, align_lang, used_device, report
-        )
+        if args.align == "auto":
+            _unload_whisper_vram()
+            segments, aligned = align_with_whisperx(
+                segments, audio_path, align_lang, used_device, report
+            )
+        else:
+            report("aligning", 88, "Whisper 단어 타임스탬프 사용 (정밀 정렬 생략)")
 
         # 4. 후처리: 무음 분할/트리밍/병합/줄바꿈
         subtitles = postprocess(segments, align_lang)
