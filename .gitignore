@@ -1,0 +1,8 @@
+node_modules/
+dist/
+python/.venv/
+python/venv/
+python/build/
+bin/
+__pycache__/
+*.wav
