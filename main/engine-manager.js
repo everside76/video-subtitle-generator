@@ -48,8 +48,17 @@ function isEngineInstalled() {
   return findEngineDir() !== null;
 }
 
+/** Electron 메인 프로세스면 Chromium 네트워크 스택(net.fetch) 사용 (더 견고) */
+function getFetch() {
+  try {
+    const { net } = require('electron');
+    if (net && net.fetch) return net.fetch.bind(net);
+  } catch { /* Electron 외 환경 */ }
+  return fetch;
+}
+
 async function fetchJson(url) {
-  const res = await fetch(url, { redirect: 'follow', cache: 'no-store' });
+  const res = await getFetch()(url, { redirect: 'follow', cache: 'no-store' });
   if (!res.ok) throw new Error(`다운로드 실패 (${res.status}): ${url}`);
   return res.json();
 }
@@ -76,7 +85,7 @@ async function isPartValid(dest, part) {
 }
 
 async function downloadFile(url, dest, onBytes) {
-  const res = await fetch(url, { redirect: 'follow' });
+  const res = await getFetch()(url, { redirect: 'follow', cache: 'no-store' });
   if (!res.ok) throw new Error(`다운로드 실패 (${res.status}): ${url}`);
   const out = fs.createWriteStream(dest);
   const reader = Readable.fromWeb(res.body);
@@ -95,7 +104,7 @@ async function downloadPart(part, dest, onBytes, report) {
       }
       const hash = await sha256File(dest);
       if (hash !== part.sha256) {
-        throw new Error('해시 불일치 (파일 손상)');
+        throw new Error(`해시 불일치 (기대 ${part.sha256.slice(0, 12)}…, 실제 ${hash.slice(0, 12)}…)`);
       }
       return;
     } catch (err) {
