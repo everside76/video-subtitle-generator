@@ -502,6 +502,21 @@ const APP_VERSION = require(path.join(__dirname, '..', 'package.json')).version;
 
 const CHANGELOG = [
   {
+    version: '1.5.1',
+    date: '2026-07-19',
+    sections: [
+      {
+        title: 'Fixed',
+        type: 'fixed',
+        items: [
+          '엔진 다운로드 무결성 검증(SHA256) 추가 — 손상된 파일로 설치 실패하던 문제 해결',
+          '손상된 파트만 자동 재다운로드, 정상 파트는 재사용 (재시도 시 처음부터 다시 받지 않음)',
+          '압축 해제 실패 시 대체 방식(PowerShell)으로 자동 재시도',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.5.0',
     date: '2026-07-19',
     sections: [

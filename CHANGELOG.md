@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1] - 2026-07-19
+
+### Fixed
+- 엔진 다운로드 무결성 검증(파트별/병합본 SHA256) — 손상 다운로드로 "Invalid central directory signature" 압축 해제 실패하던 문제
+- 손상 파트만 최대 3회 재다운로드, 검증된 파트는 재사용 (이어받기 효과)
+- tar 압축 해제 실패 시 PowerShell Expand-Archive로 자동 폴백
+
 ## [1.5.0] - 2026-07-19
 
 ### Added
