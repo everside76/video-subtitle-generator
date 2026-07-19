@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_all, copy_metadata
 
 datas = []
 binaries = []
@@ -32,6 +32,10 @@ datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('sklearn')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 hiddenimports += ['pyannote.audio', 'lightning_fabric']
+# transformers가 importlib.metadata로 버전을 조회하는 패키지들의 dist-info
+datas += copy_metadata('torchcodec')
+datas += copy_metadata('torchaudio')
+datas += copy_metadata('torch')
 
 
 a = Analysis(

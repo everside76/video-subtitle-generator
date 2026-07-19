@@ -55,7 +55,17 @@ def align_with_whisperx(segments, audio_path, language, device, report):
                 report("aligning", 92, "정렬 완료 (CPU)")
                 return result["segments"], True
             except BaseException as e2:
+                _print_traceback()
                 report("warning", 92, f"정렬 실패({type(e2).__name__}: {e2}) — 기본 타임스탬프 사용")
                 return segments, False
+        _print_traceback()
         report("warning", 92, f"정렬 실패({type(e).__name__}: {e}) — 기본 타임스탬프 사용")
         return segments, False
+
+
+def _print_traceback():
+    """정렬 실패의 근본 원인 진단용 — stderr로 전체 트레이스백 출력 (JSON 스트림 오염 없음)"""
+    import sys
+    import traceback
+    traceback.print_exc(file=sys.stderr)
+    sys.stderr.flush()
