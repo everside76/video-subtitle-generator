@@ -39,7 +39,7 @@ let selectedItemId = null;
 let currentProcessingId = null;
 
 // ===== 설정 영속화 =====
-const SETTING_IDS = ['engine-select', 'model-select', 'device-select', 'language-select'];
+const SETTING_IDS = ['engine-select', 'model-select', 'device-select', 'language-select', 'translate-select'];
 
 function loadSettings() {
   SETTING_IDS.forEach(id => {
@@ -353,6 +353,7 @@ async function startQueue() {
       model: document.getElementById('model-select').value,
       device: document.getElementById('device-select').value,
       language: document.getElementById('language-select').value,
+      translate: document.getElementById('translate-select').value,
     };
 
     try {
@@ -501,6 +502,21 @@ newVideoBtn.addEventListener('click', () => {
 const APP_VERSION = require(path.join(__dirname, '..', 'package.json')).version;
 
 const CHANGELOG = [
+  {
+    version: '1.7.0',
+    date: '2026-07-19',
+    sections: [
+      {
+        title: 'Added',
+        type: 'added',
+        items: [
+          '한국어 번역 자막: 음성이 한국어가 아니면 자동으로 한국어 자막 생성',
+          '번역 모드 선택: 한국어로 번역(기본) / 원문+한국어 / 사용 안 함',
+          '번역 진행률 표시, 일부 실패 시 해당 자막만 원문 유지',
+        ],
+      },
+    ],
+  },
   {
     version: '1.6.1',
     date: '2026-07-19',
