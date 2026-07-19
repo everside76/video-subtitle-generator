@@ -77,6 +77,14 @@ def _load_cuda_libs():
                 os.environ['PATH'] = d + os.pathsep + os.environ.get('PATH', '')
 
 
+# Windows 콘솔(cp949)에서 유니코드 메시지 출력 크래시 방지 — Electron은 UTF-8로 읽음
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 # 시작 시 CUDA DLL 로드
 _load_cuda_libs()
 
