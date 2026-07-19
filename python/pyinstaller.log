@@ -1,0 +1,8 @@
+161 INFO: PyInstaller: 6.19.0, contrib hooks: 2026.2
+161 INFO: Python: 3.13.14
+184 INFO: Platform: Windows-11-10.0.26200-SP0
+184 INFO: Python environment: C:\Users\evers\Documents\AUTOMATA\video-subtitle-generator\python\.venv
+C:\Users\evers\Documents\AUTOMATA\video-subtitle-generator\python\.venv\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.0.1)/charset_normalizer (3.4.5) doesn't match a supported version!
+  warnings.warn(
+C:\Users\evers\Documents\AUTOMATA\video-subtitle-generator\python\.venv\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.0.1)/charset_normalizer (3.4.5) doesn't match a supported version!
+  warnings.warn(

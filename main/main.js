@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const subtitleOps = require('./subtitle-operations');
+const engineManager = require('./engine-manager');
 
 let mainWindow;
 let splashWindow;
@@ -150,9 +151,78 @@ ipcMain.handle('check-dependencies', () => {
   return subtitleOps.checkDependenciesFast();
 });
 
+// IPC: 엔진 설치 상태
+ipcMain.handle('engine-status', () => {
+  return {
+    installed: engineManager.isEngineInstalled(),
+    version: engineManager.ENGINE_VERSION,
+    dir: engineManager.findEngineDir(),
+  };
+});
+
+// IPC: 엔진 다운로드 + 설치
+let engineInstalling = false;
+ipcMain.handle('engine-install', async () => {
+  if (engineInstalling) return { ok: false, message: '이미 설치 진행 중입니다.' };
+  engineInstalling = true;
+  try {
+    await engineManager.installEngine((progress) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('engine-progress', progress);
+      }
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, message: err.message };
+  } finally {
+    engineInstalling = false;
+  }
+});
+
+// ===== 앱 자동 업데이트 (GitHub Releases) =====
+function setupAutoUpdater() {
+  if (!app.isPackaged) return; // 개발 모드에서는 비활성화
+  let autoUpdater;
+  try {
+    ({ autoUpdater } = require('electron-updater'));
+  } catch {
+    return; // electron-updater 미설치 환경
+  }
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-available', (info) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('app-update', { state: 'downloading', version: info.version });
+    }
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('app-update', { state: 'ready', version: info.version });
+    }
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: '업데이트 준비 완료',
+      message: `새 버전 v${info.version}이 다운로드되었습니다.`,
+      detail: '지금 재시작하여 적용하거나, 다음 실행 시 자동으로 적용됩니다.',
+      buttons: ['지금 재시작', '나중에'],
+      defaultId: 0,
+    }).then(({ response }) => {
+      if (response === 0) autoUpdater.quitAndInstall();
+    });
+  });
+
+  autoUpdater.on('error', () => { /* 네트워크 오류 등은 조용히 무시 */ });
+
+  autoUpdater.checkForUpdates().catch(() => {});
+}
+
 app.whenReady().then(() => {
   createSplashWindow();
   createWindow();
+  setupAutoUpdater();
 });
 
 app.on('window-all-closed', () => {

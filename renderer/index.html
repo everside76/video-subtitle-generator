@@ -88,14 +88,21 @@
 
     <!-- Content Area -->
     <div id="content">
-      <!-- Dependency Warning -->
+      <!-- Dependency Warning / Engine Install -->
       <div id="dep-warning">
-        <div class="title">필수 프로그램 확인</div>
+        <div class="title">음성 인식 엔진 설치</div>
         <div class="dep-list" id="dep-list"></div>
-        <div class="message">
-          누락된 항목을 설치한 후 앱을 다시 시작하세요.<br>
-          <code>scripts\setup.bat</code> 을 실행하면 자동으로 설치됩니다.
+        <div class="message" id="engine-message">
+          음성 인식 엔진(약 3GB 다운로드)이 설치되어 있지 않습니다.<br>
+          최초 1회만 설치하면 이후 앱 업데이트는 자동으로 빠르게 진행됩니다.
         </div>
+        <div class="engine-progress" id="engine-progress-wrap" style="display:none; width:80%; max-width:420px; margin:12px auto;">
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="engine-progress-fill"></div>
+          </div>
+          <div class="progress-message" id="engine-progress-message"></div>
+        </div>
+        <button id="engine-install-btn">엔진 다운로드 및 설치</button>
       </div>
 
       <!-- Drop Zone -->

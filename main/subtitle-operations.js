@@ -1,20 +1,13 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const engineManager = require('./engine-manager');
 
 let currentProcess = null;
 
-/**
- * 번들된 바이너리 경로를 반환.
- * 개발 모드: bin/ 폴더
- * 패키징 후: resources/bin/ 폴더 (extraResources)
- */
+/** 엔진 디렉토리 (LocalAppData 설치본 → legacy resources/bin → dev bin/) */
 function getBinDir() {
-  // 패키징된 앱인 경우 (asar)
-  const packedBin = path.join(process.resourcesPath, 'bin');
-  if (fs.existsSync(packedBin)) return packedBin;
-  // 개발 모드
-  return path.join(__dirname, '..', 'bin');
+  return engineManager.findEngineDir() || path.join(__dirname, '..', 'bin');
 }
 
 function getProcessVideoExe() {
@@ -23,6 +16,17 @@ function getProcessVideoExe() {
 
 function getFfmpegPath() {
   return path.join(getBinDir(), 'ffmpeg.exe');
+}
+
+/**
+ * 파이프라인 스크립트 디렉토리.
+ * 엔진 exe는 얇은 로더라서 실제 .py 스크립트는 앱이 제공한다.
+ * 패키징 후: resources/engine-scripts, 개발 모드: python/
+ */
+function getScriptsDir() {
+  const packed = path.join(process.resourcesPath || '', 'engine-scripts');
+  if (fs.existsSync(path.join(packed, 'process_video.py'))) return packed;
+  return path.join(__dirname, '..', 'python');
 }
 
 function processVideo(videoPath, options, onProgress, onComplete, onError) {
@@ -48,7 +52,11 @@ function processVideo(videoPath, options, onProgress, onComplete, onError) {
 
   const proc = spawn(exePath, args, {
     windowsHide: true,
-    env: { ...process.env, PATH: getBinDir() + ';' + process.env.PATH },
+    env: {
+      ...process.env,
+      PATH: getBinDir() + ';' + process.env.PATH,
+      VSG_SCRIPTS_DIR: getScriptsDir(),
+    },
   });
 
   currentProcess = proc;

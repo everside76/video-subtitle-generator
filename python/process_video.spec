@@ -39,7 +39,7 @@ datas += copy_metadata('torch')
 
 
 a = Analysis(
-    ['process_video.py'],
+    ['engine_loader.py'],
     pathex=[],
     binaries=binaries,
     datas=datas,

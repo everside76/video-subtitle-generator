@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.0] - 2026-07-19
+
+### Added
+- 앱 자동 업데이트: electron-updater + GitHub Releases (새 버전 자동 다운로드/적용)
+- 엔진 분리 설치: 6GB급 음성 인식 엔진을 앱 설치본에서 분리, 최초 실행 시 1회 자동 다운로드 (`%LOCALAPPDATA%\VideoSubtitleGenerator\engine-v2`)
+- 엔진 로더 구조: PyInstaller exe는 얇은 로더, 파이프라인 스크립트(.py)는 앱 리소스에서 로드 — 파이프라인 수정 시 엔진 재빌드 불필요, 앱 업데이트만으로 반영
+
+### Fixed
+- 설치본(PyInstaller)에서 WhisperX 정렬이 실패하던 문제: scipy 서브모듈 및 torchcodec/torch dist-info 메타데이터 번들 누락
+- 한글 Windows 콘솔(cp949)에서 유니코드 메시지 출력 시 UnicodeEncodeError로 크래시하던 문제 (stdout UTF-8 강제)
+- 파이프라인 오류가 트레이스백 없이 조용히 종료되던 문제 (os._exit가 예외를 은폐)
+- frozen 환경 multiprocessing 안전장치(freeze_support) 추가
+
 ## [1.4.0] - 2026-07-19
 
 ### Added

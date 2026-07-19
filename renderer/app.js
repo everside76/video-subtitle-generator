@@ -502,6 +502,30 @@ const APP_VERSION = require(path.join(__dirname, '..', 'package.json')).version;
 
 const CHANGELOG = [
   {
+    version: '1.5.0',
+    date: '2026-07-19',
+    sections: [
+      {
+        title: 'Added',
+        type: 'added',
+        items: [
+          '앱 자동 업데이트: GitHub Releases에서 새 버전 자동 다운로드 및 적용',
+          '엔진 분리 설치: 대용량 음성 인식 엔진을 최초 1회만 다운로드 (설치본 대폭 축소)',
+          '엔진 로더 구조: 파이프라인 코드를 앱에서 로드 — 기능 업데이트가 수 분 내로 빨라짐',
+        ],
+      },
+      {
+        title: 'Fixed',
+        type: 'fixed',
+        items: [
+          '설치본에서 정렬(WhisperX) 단계가 실패하던 문제 (scipy/torchcodec 번들 누락)',
+          '한글 Windows(cp949)에서 오류 메시지 출력 시 크래시하던 문제',
+          '오류가 표시되지 않고 조용히 종료되던 문제',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.4.0',
     date: '2026-07-19',
     sections: [
@@ -672,26 +696,46 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// ===== 엔진 설치 =====
+const engineInstallBtn = document.getElementById('engine-install-btn');
+const engineProgressWrap = document.getElementById('engine-progress-wrap');
+const engineProgressFill = document.getElementById('engine-progress-fill');
+const engineProgressMessage = document.getElementById('engine-progress-message');
+const engineMessage = document.getElementById('engine-message');
+
+ipcRenderer.on('engine-progress', (event, { percent, message }) => {
+  engineProgressWrap.style.display = 'block';
+  engineProgressFill.style.width = (percent || 0) + '%';
+  engineProgressMessage.textContent = message || '';
+});
+
+engineInstallBtn.addEventListener('click', async () => {
+  engineInstallBtn.disabled = true;
+  engineMessage.textContent = '엔진을 설치하는 동안 앱을 종료하지 마세요.';
+  const result = await ipcRenderer.invoke('engine-install');
+  if (result.ok) {
+    engineProgressMessage.textContent = '설치 완료!';
+    showView('drop');
+  } else {
+    engineInstallBtn.disabled = false;
+    engineProgressMessage.textContent = '설치 실패: ' + (result.message || '알 수 없는 오류');
+  }
+});
+
+// ===== 앱 자동 업데이트 상태 표시 =====
+ipcRenderer.on('app-update', (event, { state, version }) => {
+  if (state === 'downloading') {
+    appVersion.textContent = `v${APP_VERSION} → v${version} 받는 중`;
+  } else if (state === 'ready') {
+    appVersion.textContent = `v${APP_VERSION} → v${version} 준비됨`;
+  }
+});
+
 // ===== 초기화 =====
 async function init() {
   const deps = await ipcRenderer.invoke('check-dependencies');
 
   if (!deps.processVideo || !deps.ffmpeg) {
-    const depList = document.getElementById('dep-list');
-    depList.innerHTML = '';
-
-    const items = [
-      { name: '자막 엔진 (process_video.exe)', ok: deps.processVideo },
-      { name: 'ffmpeg', ok: deps.ffmpeg },
-    ];
-
-    items.forEach(item => {
-      const div = document.createElement('div');
-      div.className = 'dep-item ' + (item.ok ? 'ok' : 'missing');
-      div.textContent = (item.ok ? '  ' : '  ') + item.name;
-      depList.appendChild(div);
-    });
-
     showView('dep-warning');
   } else {
     showView('drop');
