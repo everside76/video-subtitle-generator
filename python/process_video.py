@@ -422,6 +422,16 @@ def main():
             "device": device_label
         })
 
+    except SystemExit:
+        raise
+    except BaseException as e:
+        # os._exit가 finally에서 트레이스백을 삼키지 않도록 먼저 보고
+        import traceback
+        report("error", 0, f"처리 실패: {type(e).__name__}: {e}")
+        print(traceback.format_exc(), file=sys.stderr, flush=True)
+        if _whisper_model is not None:
+            os._exit(1)
+        raise
     finally:
         # 임시 파일 정리
         if os.path.exists(audio_path):
@@ -437,4 +447,8 @@ def main():
 
 
 if __name__ == "__main__":
+    # frozen(PyInstaller) 환경에서 multiprocessing 자식 프로세스가
+    # 메인 스크립트를 재실행하는 것을 방지 (필수)
+    import multiprocessing
+    multiprocessing.freeze_support()
     main()

@@ -39,7 +39,9 @@ def align_with_whisperx(segments, audio_path, language, device, report):
         aligned = result["segments"]
         report("aligning", 92, f"정렬 완료 ({len(aligned)}개 구간)")
         return aligned, True
-    except Exception as e:
+    except BaseException as e:
+        # frozen(PyInstaller) 환경에서 SystemExit 등 Exception이 아닌 예외도
+        # 파이프라인을 죽이지 않도록 BaseException까지 폴백 처리
         if align_device == "cuda":
             # GPU 실패(OOM 등) 시 CPU로 1회 재시도
             try:
@@ -52,8 +54,8 @@ def align_with_whisperx(segments, audio_path, language, device, report):
                     return_char_alignments=False)
                 report("aligning", 92, "정렬 완료 (CPU)")
                 return result["segments"], True
-            except Exception as e2:
-                report("warning", 92, f"정렬 실패({e2}) — 기본 타임스탬프 사용")
+            except BaseException as e2:
+                report("warning", 92, f"정렬 실패({type(e2).__name__}: {e2}) — 기본 타임스탬프 사용")
                 return segments, False
-        report("warning", 92, f"정렬 실패({e}) — 기본 타임스탬프 사용")
+        report("warning", 92, f"정렬 실패({type(e).__name__}: {e}) — 기본 타임스탬프 사용")
         return segments, False
