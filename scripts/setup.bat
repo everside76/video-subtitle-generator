@@ -34,6 +34,8 @@ echo.
 echo 설치 확인 중...
 python -c "from faster_whisper import WhisperModel; print('[OK] faster-whisper')"
 python -c "from deep_translator import GoogleTranslator; print('[OK] deep-translator')"
+python -c "import torch; print('[OK] torch', torch.__version__, 'CUDA:', torch.cuda.is_available())"
+python -c "import whisperx; print('[OK] whisperx')"
 
 echo.
 echo === 설치 완료! ===
