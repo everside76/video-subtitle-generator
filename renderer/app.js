@@ -502,6 +502,20 @@ const APP_VERSION = require(path.join(__dirname, '..', 'package.json')).version;
 
 const CHANGELOG = [
   {
+    version: '1.5.2',
+    date: '2026-07-19',
+    sections: [
+      {
+        title: 'Fixed',
+        type: 'fixed',
+        items: [
+          '엔진 다운로드를 Chromium 네트워크 방식으로 전환 (다운로드 손상 대응)',
+          '해시 불일치 시 상세 진단 정보 표시',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.5.1',
     date: '2026-07-19',
     sections: [
