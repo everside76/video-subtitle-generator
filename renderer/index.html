@@ -57,13 +57,6 @@
       </select>
     </label>
     <label>
-      정밀 정렬 (WhisperX):
-      <select id="align-select">
-        <option value="off" selected>사용 안 함 (권장, 안정적)</option>
-        <option value="auto">자동 (GPU 여유 시 사용)</option>
-      </select>
-    </label>
-    <label>
       음성 언어:
       <select id="language-select">
         <option value="ko" selected>한국어</option>
@@ -136,12 +129,8 @@
             <div class="dot">2</div>
             <div class="label">음성<br>인식</div>
           </div>
-          <div class="step" data-stage="aligning">
-            <div class="dot">3</div>
-            <div class="label">타임스탬프<br>정렬</div>
-          </div>
           <div class="step" data-stage="generating">
-            <div class="dot">4</div>
+            <div class="dot">3</div>
             <div class="label">자막<br>생성</div>
           </div>
         </div>

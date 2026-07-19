@@ -17,7 +17,6 @@ import atexit
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from subtitle_postprocess import postprocess
-from align_segments import align_with_whisperx
 
 
 def _load_cuda_libs():
@@ -371,9 +370,6 @@ def main():
     parser.add_argument("--language", default="auto",
                         choices=["auto", "ko", "en", "ja", "zh"],
                         help="음성 언어 (auto=자동 감지)")
-    parser.add_argument("--align", default="off",
-                        choices=["auto", "off"],
-                        help="WhisperX 정밀 정렬 (off=Whisper 단어 타임스탬프 사용, 기본)")
     args = parser.parse_args()
 
     # 번들된 ffmpeg 경로를 전역으로 설정
@@ -422,24 +418,15 @@ def main():
             report("error", 0, "음성이 감지되지 않았습니다.")
             sys.exit(1)
 
-        # 3. 강제 정렬 (옵션, 실패 시 Whisper 단어 타임스탬프로 폴백)
-        align_lang = args.language if args.language != "auto" else detected_lang
-        if args.align == "auto":
-            _unload_whisper_vram()
-            segments, aligned = align_with_whisperx(
-                segments, audio_path, align_lang, used_device, report
-            )
-        else:
-            report("aligning", 88, "Whisper 단어 타임스탬프 사용 (정밀 정렬 생략)")
-
-        # 4. 후처리: 무음 분할/트리밍/병합/줄바꿈
-        subtitles = postprocess(segments, align_lang)
+        # 3. 후처리: Whisper 단어 타임스탬프 기반 무음 분할/트리밍/병합/줄바꿈
+        sub_lang = args.language if args.language != "auto" else detected_lang
+        subtitles = postprocess(segments, sub_lang)
 
         if not subtitles:
             report("error", 0, "자막을 생성할 수 없습니다 (유효한 발화 없음).")
             sys.exit(1)
 
-        # 5. SRT 생성
+        # 4. SRT 생성
         generate_srt(subtitles, srt_path)
 
         # 완료

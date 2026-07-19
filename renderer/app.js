@@ -39,7 +39,7 @@ let selectedItemId = null;
 let currentProcessingId = null;
 
 // ===== 설정 영속화 =====
-const SETTING_IDS = ['engine-select', 'model-select', 'device-select', 'language-select', 'align-select'];
+const SETTING_IDS = ['engine-select', 'model-select', 'device-select', 'language-select'];
 
 function loadSettings() {
   SETTING_IDS.forEach(id => {
@@ -353,7 +353,6 @@ async function startQueue() {
       model: document.getElementById('model-select').value,
       device: document.getElementById('device-select').value,
       language: document.getElementById('language-select').value,
-      align: document.getElementById('align-select').value,
     };
 
     try {
@@ -406,7 +405,7 @@ function stopQueue() {
 }
 
 // ===== 진행률 업데이트 =====
-const stageOrder = ['extracting', 'transcribing', 'aligning', 'generating'];
+const stageOrder = ['extracting', 'transcribing', 'generating'];
 
 ipcRenderer.on('processing-progress', (event, data) => {
   const { stage, progress, message } = data;
@@ -502,6 +501,21 @@ newVideoBtn.addEventListener('click', () => {
 const APP_VERSION = require(path.join(__dirname, '..', 'package.json')).version;
 
 const CHANGELOG = [
+  {
+    version: '1.6.1',
+    date: '2026-07-19',
+    sections: [
+      {
+        title: 'Changed',
+        type: 'changed',
+        items: [
+          'WhisperX 완전 제거: 무음 자막 제거는 Whisper 단어 타임스탬프 + 후처리로 동작',
+          '진행 단계를 3단계(추출/인식/생성)로 단순화',
+          '설정에서 정밀 정렬 옵션 제거',
+        ],
+      },
+    ],
+  },
   {
     version: '1.6.0',
     date: '2026-07-19',

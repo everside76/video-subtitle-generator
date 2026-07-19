@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1] - 2026-07-19
+
+### Changed
+- WhisperX 완전 제거 (align_segments.py 삭제, --align 인자/UI 옵션/정렬 단계 제거)
+- requirements.txt와 PyInstaller spec에서 whisperx/transformers/scipy/sklearn 수집 제거 (다음 엔진 빌드부터 번들 대폭 축소)
+- 무음 자막 제거는 Whisper word_timestamps + subtitle_postprocess.py가 전담
+
 ## [1.6.0] - 2026-07-19
 
 ### Changed
