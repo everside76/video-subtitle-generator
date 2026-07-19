@@ -14,6 +14,11 @@ import tempfile
 import gc
 import atexit
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from subtitle_postprocess import postprocess
+from align_segments import align_with_whisperx
+
 
 def _load_cuda_libs():
     """CUDA DLL을 명시적으로 로드 (PyInstaller 번들 + venv 환경 대응)"""
@@ -113,7 +118,8 @@ def detect_device(requested_device):
         ctranslate2.get_supported_compute_types("cuda")
         # CUDA 테스트 - 실제로 GPU에 접근 가능한지 확인
         if requested_device in ("cuda", "auto"):
-            return "cuda", "float16"
+            # 8GB VRAM에서 large-v3 안전 로드 (품질 손실 미미)
+            return "cuda", "int8_float16"
     except Exception:
         if requested_device == "cuda":
             report("warning", 0, "CUDA를 사용할 수 없습니다. CPU로 전환합니다.")
@@ -143,15 +149,16 @@ def extract_audio(video_path, audio_path):
     report("extracting", 15, "오디오 추출 완료")
 
 
-def transcribe_audio(audio_path, model_size="base", device="auto", engine="faster-whisper"):
+def transcribe_audio(audio_path, model_size="base", device="auto",
+                     engine="faster-whisper", language="auto"):
     """음성 인식 (엔진 선택 가능)"""
     if engine == "openai-whisper":
-        return _transcribe_openai(audio_path, model_size, device)
+        return _transcribe_openai(audio_path, model_size, device, language)
     else:
-        return _transcribe_faster(audio_path, model_size, device)
+        return _transcribe_faster(audio_path, model_size, device, language)
 
 
-def _transcribe_faster(audio_path, model_size="base", device="auto"):
+def _transcribe_faster(audio_path, model_size="base", device="auto", language="auto"):
     """faster-whisper (CTranslate2) 엔진으로 음성 인식"""
     global _whisper_model
 
@@ -175,9 +182,15 @@ def _transcribe_faster(audio_path, model_size="base", device="auto"):
 
     segments_gen, info = model.transcribe(
         audio_path,
-        language=None,
+        language=None if language == "auto" else language,
         vad_filter=True,
+        vad_parameters={"min_silence_duration_ms": 500, "speech_pad_ms": 200},
         beam_size=5,
+        word_timestamps=True,
+        condition_on_previous_text=False,
+        compression_ratio_threshold=2.4,
+        log_prob_threshold=-1.0,
+        no_speech_threshold=0.6,
     )
 
     detected_lang = info.language
@@ -187,10 +200,15 @@ def _transcribe_faster(audio_path, model_size="base", device="auto"):
 
     segments = []
     for seg in segments_gen:
+        words = []
+        if seg.words:
+            for wd in seg.words:
+                words.append({"word": wd.word, "start": wd.start, "end": wd.end})
         segments.append({
             "start": seg.start,
             "end": seg.end,
-            "text": seg.text.strip()
+            "text": seg.text.strip(),
+            "words": words,
         })
         if len(segments) % 10 == 0:
             report("transcribing", min(35 + len(segments) // 2, 65),
@@ -202,7 +220,7 @@ def _transcribe_faster(audio_path, model_size="base", device="auto"):
     return segments, detected_lang, actual_device
 
 
-def _transcribe_openai(audio_path, model_size="base", device="auto"):
+def _transcribe_openai(audio_path, model_size="base", device="auto", language="auto"):
     """OpenAI Whisper (PyTorch) 엔진으로 음성 인식"""
     global _whisper_model
 
@@ -228,8 +246,10 @@ def _transcribe_openai(audio_path, model_size="base", device="auto"):
 
     result = model.transcribe(
         audio_path,
-        language=None,
+        language=None if language == "auto" else language,
         verbose=False,
+        word_timestamps=True,
+        condition_on_previous_text=False,
     )
 
     detected_lang = result.get("language", "unknown")
@@ -238,10 +258,13 @@ def _transcribe_openai(audio_path, model_size="base", device="auto"):
 
     segments = []
     for seg in result.get("segments", []):
+        words = [{"word": wd["word"], "start": wd["start"], "end": wd["end"]}
+                 for wd in seg.get("words", [])]
         segments.append({
             "start": seg["start"],
             "end": seg["end"],
-            "text": seg["text"].strip()
+            "text": seg["text"].strip(),
+            "words": words,
         })
         if len(segments) % 10 == 0:
             report("transcribing", min(35 + len(segments) // 2, 65),
@@ -251,6 +274,16 @@ def _transcribe_openai(audio_path, model_size="base", device="auto"):
            f"[openai-whisper] 음성 인식 완료 ({len(segments)}개 구간, {device_label})")
 
     return segments, detected_lang, actual_device
+
+
+def _unload_whisper_vram():
+    """정렬 모델 로드 전 인식 모델의 VRAM 해제 (Python 객체는 유지해 GC 크래시 방지)"""
+    global _whisper_model
+    try:
+        if _whisper_model is not None and hasattr(_whisper_model, "model"):
+            _whisper_model.model.unload_model()
+    except Exception:
+        pass
 
 
 def format_timestamp(seconds):
@@ -311,6 +344,9 @@ def main():
     parser.add_argument("--engine", default="faster-whisper",
                         choices=["faster-whisper", "openai-whisper"],
                         help="Whisper 엔진 (faster-whisper=CTranslate2, openai-whisper=PyTorch)")
+    parser.add_argument("--language", default="auto",
+                        choices=["auto", "ko", "en", "ja", "zh"],
+                        help="음성 언어 (auto=자동 감지)")
     args = parser.parse_args()
 
     # 번들된 ffmpeg 경로를 전역으로 설정
@@ -352,22 +388,36 @@ def main():
 
         # 2. 음성 인식 (GPU/CPU 자동 선택)
         segments, detected_lang, used_device = transcribe_audio(
-            audio_path, args.model, args.device, args.engine
+            audio_path, args.model, args.device, args.engine, args.language
         )
 
         if not segments:
             report("error", 0, "음성이 감지되지 않았습니다.")
             sys.exit(1)
 
-        # 3. SRT 생성
-        generate_srt(segments, srt_path)
+        # 3. 강제 정렬 (실패 시 Whisper 단어 타임스탬프로 폴백)
+        align_lang = args.language if args.language != "auto" else detected_lang
+        _unload_whisper_vram()
+        segments, aligned = align_with_whisperx(
+            segments, audio_path, align_lang, used_device, report
+        )
+
+        # 4. 후처리: 무음 분할/트리밍/병합/줄바꿈
+        subtitles = postprocess(segments, align_lang)
+
+        if not subtitles:
+            report("error", 0, "자막을 생성할 수 없습니다 (유효한 발화 없음).")
+            sys.exit(1)
+
+        # 5. SRT 생성
+        generate_srt(subtitles, srt_path)
 
         # 완료
         device_label = "GPU" if used_device == "cuda" else "CPU"
         report("complete", 100, "완료!", result={
             "srt_path": srt_path,
             "language": detected_lang,
-            "segments": len(segments),
+            "segments": len(subtitles),
             "duration": duration_str,
             "device": device_label
         })
