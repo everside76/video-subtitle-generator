@@ -655,6 +655,8 @@ function closeChangelog() {
 
 // 버전 배지 클릭 → 업데이트 이력 열기
 appVersion.textContent = `v${APP_VERSION}`;
+// 창 제목에도 버전 표시
+document.title = `비디오 자막 생성기 v${APP_VERSION}`;
 appVersion.addEventListener('click', openChangelog);
 
 // 모달 닫기
