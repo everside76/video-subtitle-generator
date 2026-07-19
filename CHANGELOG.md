@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.3] - 2026-07-19
+
+### Fixed
+- GPU 메모리 부족 시 정렬: 여유 VRAM 확인 후 부족하면 즉시 CPU 전환 (OOM 대기 제거)
+- PYTORCH_CUDA_ALLOC_CONF=expandable_segments로 메모리 파편화 완화
+- 정렬 완료 후 GPU 메모리 즉시 반환, CPU 재시도 전 캐시 정리
+
 ## [1.5.2] - 2026-07-19
 
 ### Fixed

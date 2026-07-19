@@ -502,6 +502,21 @@ const APP_VERSION = require(path.join(__dirname, '..', 'package.json')).version;
 
 const CHANGELOG = [
   {
+    version: '1.5.3',
+    date: '2026-07-19',
+    sections: [
+      {
+        title: 'Fixed',
+        type: 'fixed',
+        items: [
+          'GPU 메모리 부족 시 정렬 처리 개선: 여유 VRAM 확인 후 부족하면 즉시 CPU 전환',
+          'CUDA 메모리 파편화 완화 설정 적용 (OOM 발생률 감소)',
+          '정렬 후 GPU 메모리 즉시 반환',
+        ],
+      },
+    ],
+  },
+  {
     version: '1.5.2',
     date: '2026-07-19',
     sections: [

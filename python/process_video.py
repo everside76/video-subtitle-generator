@@ -85,6 +85,9 @@ for _stream in (sys.stdout, sys.stderr):
         except Exception:
             pass
 
+# CUDA 메모리 파편화로 인한 OOM 완화 (torch 로드 전에 설정해야 유효)
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 # 시작 시 CUDA DLL 로드
 _load_cuda_libs()
 
@@ -290,6 +293,7 @@ def _unload_whisper_vram():
     try:
         if _whisper_model is not None and hasattr(_whisper_model, "model"):
             _whisper_model.model.unload_model()
+            gc.collect()
     except Exception:
         pass
 

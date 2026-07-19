@@ -27,6 +27,21 @@ def align_with_whisperx(segments, audio_path, language, device, report):
 
     align_device = "cuda" if (device == "cuda" and torch.cuda.is_available()) else "cpu"
 
+    # GPU 여유 메모리가 부족하면 OOM으로 시간 낭비하지 않고 바로 CPU 사용
+    MIN_FREE_VRAM = 2.0 * 1024 ** 3
+    if align_device == "cuda":
+        try:
+            free_vram, total_vram = torch.cuda.mem_get_info()
+            import sys as _sys
+            print(f"[align] VRAM free {free_vram / 1e9:.2f}GB / total {total_vram / 1e9:.2f}GB",
+                  file=_sys.stderr, flush=True)
+            if free_vram < MIN_FREE_VRAM:
+                report("aligning", 86,
+                       f"GPU 메모리 부족({free_vram / 1e9:.1f}GB 여유) — CPU로 정렬합니다")
+                align_device = "cpu"
+        except Exception:
+            pass
+
     try:
         report("aligning", 86, f"정렬 모델 로딩 중 ({language}, {align_device})...")
         model_a, metadata = whisperx.load_align_model(
@@ -37,6 +52,9 @@ def align_with_whisperx(segments, audio_path, language, device, report):
             segments, model_a, metadata, audio, align_device,
             return_char_alignments=False)
         aligned = result["segments"]
+        del model_a
+        if align_device == "cuda":
+            torch.cuda.empty_cache()
         report("aligning", 92, f"정렬 완료 ({len(aligned)}개 구간)")
         return aligned, True
     except BaseException as e:
@@ -45,6 +63,10 @@ def align_with_whisperx(segments, audio_path, language, device, report):
         if align_device == "cuda":
             # GPU 실패(OOM 등) 시 CPU로 1회 재시도
             try:
+                try:
+                    torch.cuda.empty_cache()
+                except Exception:
+                    pass
                 report("aligning", 86, f"GPU 정렬 실패({type(e).__name__}) — CPU로 재시도...")
                 model_a, metadata = whisperx.load_align_model(
                     language_code=language, device="cpu")
