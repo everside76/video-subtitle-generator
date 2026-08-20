@@ -32,20 +32,28 @@
   <!-- Settings -->
   <div id="settings-panel">
     <label>
-      Whisper 엔진:
+      음성 인식 엔진:
       <select id="engine-select">
         <option value="faster-whisper" selected>faster-whisper (CTranslate2, 최고 성능)</option>
         <option value="openai-whisper">openai-whisper (PyTorch, 원본)</option>
+        <option value="crisperwhisper">CrisperWhisper 2.0 (정밀 타임스탬프)</option>
       </select>
     </label>
     <label>
-      Whisper 모델:
+      모델:
       <select id="model-select">
         <option value="tiny">tiny (빠름, 낮은 정확도)</option>
         <option value="base">base (균형)</option>
         <option value="small">small (보통)</option>
         <option value="medium">medium (높은 정확도)</option>
         <option value="large-v3" selected>large-v3 (최고 정확도)</option>
+      </select>
+    </label>
+    <label id="cw-mode-label" style="display:none;">
+      전사 모드:
+      <select id="cw-mode-select">
+        <option value="intended" selected>정제 (읽기 좋은 자막)</option>
+        <option value="verbatim">축어 (말한 그대로, 필러 포함)</option>
       </select>
     </label>
     <label>

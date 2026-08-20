@@ -39,7 +39,80 @@ let selectedItemId = null;
 let currentProcessingId = null;
 
 // ===== 설정 영속화 =====
-const SETTING_IDS = ['engine-select', 'model-select', 'device-select', 'language-select', 'translate-select'];
+const SETTING_IDS = ['engine-select', 'device-select', 'language-select', 'translate-select', 'cw-mode-select'];
+
+// 모델 목록은 엔진마다 다르므로 별도 관리 (설정도 엔진별로 저장)
+const ENGINE_MODELS = {
+  'faster-whisper': [
+    ['tiny', 'tiny (빠름, 낮은 정확도)'],
+    ['base', 'base (균형)'],
+    ['small', 'small (보통)'],
+    ['medium', 'medium (높은 정확도)'],
+    ['large-v3', 'large-v3 (최고 정확도)'],
+  ],
+  'openai-whisper': [
+    ['tiny', 'tiny (빠름, 낮은 정확도)'],
+    ['base', 'base (균형)'],
+    ['small', 'small (보통)'],
+    ['medium', 'medium (높은 정확도)'],
+    ['large-v3', 'large-v3 (최고 정확도)'],
+  ],
+  'crisperwhisper': [
+    ['large', 'large (최고 정확도)'],
+    ['turbo', 'turbo (빠름)'],
+    ['medium', 'medium (균형)'],
+    ['small', 'small (가벼움)'],
+  ],
+};
+const ENGINE_DEFAULT_MODEL = {
+  'faster-whisper': 'large-v3',
+  'openai-whisper': 'large-v3',
+  'crisperwhisper': 'large',
+};
+
+// 엔진에 맞춰 모델 목록/전사 모드/언어 제약 동기화
+function syncEngineUI() {
+  const engine = document.getElementById('engine-select').value;
+  const modelSel = document.getElementById('model-select');
+  const models = ENGINE_MODELS[engine] || ENGINE_MODELS['faster-whisper'];
+
+  const saved = localStorage.getItem('setting:model-select@' + engine);
+  modelSel.innerHTML = '';
+  for (const [value, label] of models) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    modelSel.appendChild(opt);
+  }
+  const values = models.map(([v]) => v);
+  modelSel.value = values.includes(saved)
+    ? saved : (ENGINE_DEFAULT_MODEL[engine] || values[0]);
+
+  // CrisperWhisper 전용 전사 모드 표시
+  document.getElementById('cw-mode-label').style.display =
+    engine === 'crisperwhisper' ? '' : 'none';
+
+  // CrisperWhisper는 언어 자동 감지 미지원
+  const langSel = document.getElementById('language-select');
+  const autoOpt = [...langSel.options].find((o) => o.value === 'auto');
+  if (autoOpt) autoOpt.disabled = engine === 'crisperwhisper';
+  if (engine === 'crisperwhisper' && langSel.value === 'auto') {
+    langSel.value = 'en';
+    localStorage.setItem('setting:language-select', 'en');
+  }
+}
+
+// 기존 단일 모델 설정을 엔진별 키로 1회 이전
+function migrateModelSetting() {
+  const legacy = localStorage.getItem('setting:model-select');
+  if (legacy === null) return;
+  ['faster-whisper', 'openai-whisper'].forEach(engine => {
+    if (ENGINE_MODELS[engine].some(([v]) => v === legacy)) {
+      localStorage.setItem('setting:model-select@' + engine, legacy);
+    }
+  });
+  localStorage.removeItem('setting:model-select');
+}
 
 function loadSettings() {
   SETTING_IDS.forEach(id => {
@@ -50,7 +123,18 @@ function loadSettings() {
     }
     el.addEventListener('change', () => {
       localStorage.setItem('setting:' + id, el.value);
+      if (id === 'engine-select') syncEngineUI();
     });
+  });
+
+  migrateModelSetting();
+  syncEngineUI();
+
+  // 모델은 엔진별로 저장
+  document.getElementById('model-select').addEventListener('change', () => {
+    const engine = document.getElementById('engine-select').value;
+    localStorage.setItem('setting:model-select@' + engine,
+      document.getElementById('model-select').value);
   });
 }
 loadSettings();
@@ -354,6 +438,7 @@ async function startQueue() {
       device: document.getElementById('device-select').value,
       language: document.getElementById('language-select').value,
       translate: document.getElementById('translate-select').value,
+      cwMode: document.getElementById('cw-mode-select').value,
     };
 
     try {

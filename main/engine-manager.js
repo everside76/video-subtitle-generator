@@ -15,7 +15,7 @@ const { spawn } = require('child_process');
 const { Readable } = require('stream');
 const { pipeline } = require('stream/promises');
 
-const ENGINE_VERSION = 2;
+const ENGINE_VERSION = 3;
 const REPO = 'everside76/video-subtitle-generator';
 const RELEASE_BASE = `https://github.com/${REPO}/releases/download/engine-v${ENGINE_VERSION}`;
 const PART_RETRIES = 3;
