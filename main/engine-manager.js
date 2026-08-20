@@ -245,7 +245,10 @@ async function installEngine(onProgress) {
     await extractWithPowerShell(zipPath, dest);
   }
 
-  if (!isEngineInstalled()) {
+  // 이번에 설치한 디렉토리를 직접 확인 (dev bin/ 폴백이 통과시키지 않도록)
+  const installedDir = getEngineDir();
+  if (!fs.existsSync(path.join(installedDir, 'process_video.exe'))
+    || !fs.existsSync(path.join(installedDir, 'ffmpeg.exe'))) {
     throw new Error('엔진 설치 확인 실패: 필수 파일이 없습니다.');
   }
 
