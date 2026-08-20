@@ -18,6 +18,18 @@ tmp_ret = collect_all('whisper')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('tiktoken')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('crisperwhisper')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('transformers')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('tokenizers')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('accelerate')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('soundfile')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('soxr')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 # torch/torchaudio는 openai-whisper 엔진용으로 유지 (whisperx는 v1.6.1에서 제거됨)
 tmp_ret = collect_all('torch')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
@@ -25,6 +37,13 @@ tmp_ret = collect_all('torchaudio')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 datas += copy_metadata('torchaudio')
 datas += copy_metadata('torch')
+datas += copy_metadata('transformers')
+datas += copy_metadata('tokenizers')
+datas += copy_metadata('accelerate')
+datas += copy_metadata('safetensors')
+datas += copy_metadata('crisperwhisper')
+datas += copy_metadata('huggingface_hub')
+datas += copy_metadata('numpy')
 
 
 a = Analysis(
@@ -36,7 +55,8 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['whisperx', 'pytorch_lightning', 'lightning_fabric', 'torchvision',
+              'matplotlib', 'pandas', 'sklearn', 'IPython', 'jedi'],
     noarchive=False,
     optimize=0,
 )

@@ -1,5 +1,6 @@
 --extra-index-url https://download.pytorch.org/whl/cu128
 faster-whisper>=1.0.0
+crisperwhisper[transformers]>=2.0.2
 deep-translator>=1.11.0
 torch>=2.7.0
 torchaudio>=2.7.0
