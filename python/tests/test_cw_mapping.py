@@ -85,9 +85,64 @@ def test_impl_returns_empty_on_no_words(monkeypatch):
         def transcribe(self, *a, **k):
             return FakeResult()
 
+    monkeypatch.setattr(process_video, "_whisper_model", None)
     monkeypatch.setattr(crisperwhisper, "CrisperWhisperModel", FakeModel)
     segments, lang, device = process_video._transcribe_crisperwhisper_impl(
         "dummy.wav", "large", "cpu", "en", "intended")
     assert segments == []
     assert lang == "en"
     assert device == "cpu"
+
+
+def _run_orchestrator(monkeypatch, device, impl_behaviors):
+    """impl을 가짜로 바꿔 _transcribe_crisperwhisper의 재시도 분기를 검증."""
+    pytest.importorskip("crisperwhisper")
+    import process_video
+
+    calls = []
+
+    def fake_impl(audio_path, cw_size, actual_device, language, mode):
+        calls.append(actual_device)
+        behavior = impl_behaviors[len(calls) - 1]
+        if isinstance(behavior, Exception):
+            raise behavior
+        return behavior
+
+    monkeypatch.setattr(process_video, "_transcribe_crisperwhisper_impl", fake_impl)
+    monkeypatch.setattr(process_video, "_download_cw_model", lambda repo_id: None)
+    monkeypatch.setattr(process_video, "_release_torch_vram", lambda: None)
+    result = process_video._transcribe_crisperwhisper(
+        "dummy.wav", "large", device, "en", "intended")
+    return result, calls
+
+
+def test_orchestrator_cpu_failure_propagates(monkeypatch):
+    with pytest.raises(RuntimeError, match="boom"):
+        _run_orchestrator(monkeypatch, "cpu", [RuntimeError("boom")])
+
+
+def test_orchestrator_gpu_failure_retries_cpu(monkeypatch):
+    import torch
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA 필요")
+    ok = ([{"start": 0, "end": 1, "text": "x", "words": []}], "en", "cpu")
+    result, calls = _run_orchestrator(
+        monkeypatch, "auto", [RuntimeError("oom"), ok])
+    assert calls == ["cuda", "cpu"]
+    assert result == ok
+
+
+def test_orchestrator_gpu_then_cpu_failure_propagates(monkeypatch):
+    import torch
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA 필요")
+    with pytest.raises(RuntimeError, match="cpu fail"):
+        _run_orchestrator(monkeypatch, "auto",
+                          [RuntimeError("oom"), RuntimeError("cpu fail")])
+
+
+def test_orchestrator_success_no_retry(monkeypatch):
+    ok = ([{"start": 0, "end": 1, "text": "x", "words": []}], "en", "cpu")
+    result, calls = _run_orchestrator(monkeypatch, "cpu", [ok])
+    assert calls == ["cpu"]
+    assert result == ok

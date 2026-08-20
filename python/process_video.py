@@ -93,6 +93,9 @@ _load_cuda_libs()
 # CUDA 모델을 프로세스 종료까지 유지 (GC에 의한 CUDA 크래시 방지)
 _whisper_model = None
 
+# VRAM 해제 후 종료 가드용으로 남기는 센티널 (가중치는 버리되 non-None 유지)
+_RELEASED = object()
+
 
 def _safe_exit():
     """프로세스 종료 시 GC를 비활성화하여 CUDA 객체 소멸자 크래시 방지"""
@@ -343,13 +346,16 @@ def cw_words_to_segments(words, full_text):
 
 
 def _release_torch_vram():
-    """CPU 재시도 전 GPU 모델을 CPU로 이동해 VRAM 회수 (전역 참조는 종료 가드용으로 유지)."""
+    """CPU 재시도 전 GPU 모델 해제 — VRAM 회수 후 센티널로 교체 (종료 가드는 non-None만 확인)."""
+    global _whisper_model
     try:
         import torch
         engine = getattr(_whisper_model, "_engine", None)
         m = getattr(engine, "model", None)
         if m is not None:
             m.to("cpu")
+        if _whisper_model is not None:
+            _whisper_model = _RELEASED
         gc.collect()
         torch.cuda.empty_cache()
     except Exception:
