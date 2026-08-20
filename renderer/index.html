@@ -41,13 +41,8 @@
     </label>
     <label>
       모델:
-      <select id="model-select">
-        <option value="tiny">tiny (빠름, 낮은 정확도)</option>
-        <option value="base">base (균형)</option>
-        <option value="small">small (보통)</option>
-        <option value="medium">medium (높은 정확도)</option>
-        <option value="large-v3" selected>large-v3 (최고 정확도)</option>
-      </select>
+      <!-- 옵션은 app.js의 ENGINE_MODELS로 엔진별 구성됨 -->
+      <select id="model-select"></select>
     </label>
     <label id="cw-mode-label" style="display:none;">
       전사 모드:

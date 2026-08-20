@@ -96,9 +96,13 @@ function syncEngineUI() {
   const langSel = document.getElementById('language-select');
   const autoOpt = [...langSel.options].find((o) => o.value === 'auto');
   if (autoOpt) autoOpt.disabled = engine === 'crisperwhisper';
-  if (engine === 'crisperwhisper' && langSel.value === 'auto') {
-    langSel.value = 'en';
-    localStorage.setItem('setting:language-select', 'en');
+  if (engine === 'crisperwhisper') {
+    if (langSel.value === 'auto') langSel.value = 'ko'; // 표시만 변경, 저장 안 함
+  } else {
+    const savedLang = localStorage.getItem('setting:language-select');
+    if (savedLang && [...langSel.options].some((o) => o.value === savedLang)) {
+      langSel.value = savedLang;
+    }
   }
 }
 
@@ -108,7 +112,8 @@ function migrateModelSetting() {
   if (legacy === null) return;
   ['faster-whisper', 'openai-whisper'].forEach(engine => {
     if (ENGINE_MODELS[engine].some(([v]) => v === legacy)) {
-      localStorage.setItem('setting:model-select@' + engine, legacy);
+      const key = 'setting:model-select@' + engine;
+      if (localStorage.getItem(key) === null) localStorage.setItem(key, legacy);
     }
   });
   localStorage.removeItem('setting:model-select');
@@ -587,6 +592,29 @@ newVideoBtn.addEventListener('click', () => {
 const APP_VERSION = require(path.join(__dirname, '..', 'package.json')).version;
 
 const CHANGELOG = [
+  {
+    version: '1.8.0',
+    date: '2026-08-20',
+    sections: [
+      {
+        title: 'Added',
+        type: 'added',
+        items: [
+          'CrisperWhisper 2.0 엔진 추가: 정밀 단어 타임스탬프',
+          '전사 모드 선택: 정제(읽기 좋은 자막) / 축어(말한 그대로, 필러 포함)',
+          '엔진별 모델 목록 표시 및 모델 설정 개별 저장',
+        ],
+      },
+      {
+        title: 'Changed',
+        type: 'changed',
+        items: [
+          '음성 인식 엔진 v3로 업데이트 — 최초 실행 시 엔진 재다운로드 필요',
+          'CrisperWhisper 선택 시 언어 자동 감지 비활성화 (해당 엔진 미지원)',
+        ],
+      },
+    ],
+  },
   {
     version: '1.7.0',
     date: '2026-07-19',

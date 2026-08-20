@@ -251,6 +251,15 @@ async function installEngine(onProgress) {
 
   report('cleanup', 98, '정리 중...');
   fs.rmSync(tmpDir, { recursive: true, force: true });
+  // 이전 버전 엔진 제거 (설치 성공 후에만 — 수 GB 잔류 방지)
+  try {
+    for (const entry of fs.readdirSync(getEngineRoot(), { withFileTypes: true })) {
+      const m = entry.isDirectory() && /^engine-v(\d+)$/.exec(entry.name);
+      if (m && Number(m[1]) !== ENGINE_VERSION) {
+        fs.rmSync(path.join(getEngineRoot(), entry.name), { recursive: true, force: true });
+      }
+    }
+  } catch { /* 정리 실패는 무시 */ }
   report('done', 100, '엔진 설치 완료');
 }
 
