@@ -9,6 +9,14 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $py = Join-Path $root 'python'
 
+# engine-manager.js의 ENGINE_VERSION과 불일치하면 중단 (이중 관리 방지)
+$emPath = Join-Path $root 'main\engine-manager.js'
+$emText = Get-Content -Raw -Encoding UTF8 $emPath
+if ($emText -match 'const ENGINE_VERSION = (\d+);') {
+  $jsVersion = [int]$Matches[1]
+  if ($jsVersion -ne $EngineVersion) { throw "EngineVersion($EngineVersion)이 main\engine-manager.js의 ENGINE_VERSION($jsVersion)과 다릅니다" }
+} else { throw 'main\engine-manager.js에서 ENGINE_VERSION을 찾지 못했습니다' }
+
 Write-Host '=== 사전 검증 ==='
 $free = (Get-Item $root).PSDrive.Free
 if ($null -ne $free -and $free -lt 25GB) { throw '디스크 여유 공간 부족 (최소 25GB 필요)' }

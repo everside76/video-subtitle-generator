@@ -362,6 +362,18 @@ def _release_torch_vram():
         pass
 
 
+def _is_gpu_failure(exc):
+    """GPU 관련 실패(OOM/CUDA/cuBLAS/cuDNN)만 CPU 재시도 대상으로 판정."""
+    try:
+        import torch
+        if isinstance(exc, torch.cuda.OutOfMemoryError):
+            return True
+    except Exception:
+        pass
+    msg = f"{type(exc).__name__}: {exc}".lower()
+    return any(k in msg for k in ("cuda", "out of memory", "cublas", "cudnn", "device-side"))
+
+
 def _download_cw_model(repo_id):
     """모델 사전 다운로드 (최초 1회) — HF 캐시 크기 폴링으로 진행률 보고."""
     import threading
@@ -394,6 +406,8 @@ def _download_cw_model(repo_id):
     def poll():
         while not stop.wait(2.0):
             gb = dir_size(repo_dir) / 1e9 if os.path.isdir(repo_dir) else 0.0
+            if stop.is_set():
+                break
             report("transcribing", 22,
                    f"[crisperwhisper] 모델 다운로드 중 (최초 1회)... {gb:.2f} GB")
 
@@ -446,7 +460,7 @@ def _transcribe_crisperwhisper(audio_path, model_size, device, language, mode):
         return _transcribe_crisperwhisper_impl(
             audio_path, cw_size, actual_device, language, mode)
     except Exception as e:
-        if actual_device != "cuda":
+        if actual_device != "cuda" or not _is_gpu_failure(e):
             raise
         err_name = type(e).__name__
         # except 블록을 벗어나며 예외/트레이스백 참조가 해제되어 GPU 모델 회수 가능
@@ -617,7 +631,7 @@ def main():
             report("error", 0, "음성이 감지되지 않았습니다.")
             sys.exit(1)
 
-        # 3. 후처리: Whisper 단어 타임스탬프 기반 무음 분할/트리밍/병합/줄바꿈
+        # 3. 후처리: 단어 타임스탬프 기반 무음 분할/트리밍/병합/줄바꿈 (엔진 무관)
         sub_lang = args.language if args.language != "auto" else detected_lang
         subtitles = postprocess(segments, sub_lang)
 
@@ -648,8 +662,6 @@ def main():
         import traceback
         report("error", 0, f"처리 실패: {type(e).__name__}: {e}")
         print(traceback.format_exc(), file=sys.stderr, flush=True)
-        if _whisper_model is not None:
-            os._exit(1)
         raise
     finally:
         # 임시 파일 정리

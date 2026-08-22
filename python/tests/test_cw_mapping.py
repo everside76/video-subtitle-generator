@@ -1,4 +1,4 @@
-"""CrisperWhisper 결과 매핑 단위 테스트 (모델 로드 없음)."""
+"""CrisperWhisper 엔진 단위 테스트: 결과 매핑, 상류 API 계약, impl/재시도 오케스트레이션 (모델 로드 없음)."""
 import os
 import sys
 from types import SimpleNamespace
@@ -123,22 +123,36 @@ def test_orchestrator_cpu_failure_propagates(monkeypatch):
 
 def test_orchestrator_gpu_failure_retries_cpu(monkeypatch):
     import torch
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA 필요")
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     ok = ([{"start": 0, "end": 1, "text": "x", "words": []}], "en", "cpu")
     result, calls = _run_orchestrator(
-        monkeypatch, "auto", [RuntimeError("oom"), ok])
+        monkeypatch, "auto", [RuntimeError("CUDA out of memory"), ok])
     assert calls == ["cuda", "cpu"]
     assert result == ok
 
 
 def test_orchestrator_gpu_then_cpu_failure_propagates(monkeypatch):
     import torch
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA 필요")
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     with pytest.raises(RuntimeError, match="cpu fail"):
         _run_orchestrator(monkeypatch, "auto",
-                          [RuntimeError("oom"), RuntimeError("cpu fail")])
+                          [RuntimeError("CUDA out of memory"),
+                           RuntimeError("cpu fail")])
+
+
+def test_orchestrator_non_gpu_error_not_retried(monkeypatch):
+    import torch
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    with pytest.raises(ValueError, match="bad token"):
+        _run_orchestrator(monkeypatch, "auto", [ValueError("bad token")])
+
+
+def test_is_gpu_failure_classification():
+    import process_video
+    assert process_video._is_gpu_failure(RuntimeError("CUDA out of memory. Tried to allocate"))
+    assert process_video._is_gpu_failure(RuntimeError("CUBLAS_STATUS_ALLOC_FAILED"))
+    assert not process_video._is_gpu_failure(ValueError("bad token"))
+    assert not process_video._is_gpu_failure(FileNotFoundError("model.safetensors"))
 
 
 def test_orchestrator_success_no_retry(monkeypatch):
