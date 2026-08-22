@@ -7,9 +7,10 @@
 - 엔진별 모델 목록 동적 전환 (CrisperWhisper: large/turbo/medium/small), 엔진별 모델 선택 저장
 - CrisperWhisper 모델 최초 다운로드 진행률 표시 (HF 캐시, large 기준 약 3.1GB)
 - 엔진 릴리스 패키징 스크립트 `scripts/build-engine-release.ps1` (파트 분할 + SHA256 매니페스트 자동 생성)
+- 엔진 번들에서 빌드타임 아티팩트(torch 정적 .lib / C++ 헤더, 약 2.5GB) 제거 — 다운로드 용량 약 27% 감소
 
 ### Changed
-- 엔진 v3: crisperwhisper/transformers/accelerate/soundfile/soxr 번들 추가 (ENGINE_VERSION=3, 최초 실행 시 재다운로드 필요)
+- 엔진 v3: crisperwhisper/transformers/tokenizers/accelerate/soundfile/soxr 번들 추가 (ENGINE_VERSION=3, 최초 실행 시 재다운로드 필요)
 - CrisperWhisper 선택 시 언어 자동 감지 비활성화 (미지원 — 화면 표시만 한국어로 전환)
 - 엔진 설치 성공 시 이전 버전 엔진 디렉토리 자동 정리
 - setup.bat의 whisperx 잔재 제거

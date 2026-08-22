@@ -1,39 +1,48 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all, copy_metadata
 
+
+def collect(name):
+    """미설치 패키지의 collect_all은 조용히 빈 결과를 반환하므로 하드 실패로 전환."""
+    import importlib.util
+    if importlib.util.find_spec(name) is None:
+        raise SystemExit(f"[spec] required package not installed: {name}")
+    return collect_all(name)
+
+
 datas = []
 binaries = []
 hiddenimports = ['charset_normalizer', 'chardet']
-tmp_ret = collect_all('charset_normalizer')
+tmp_ret = collect('charset_normalizer')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('ctranslate2')
+tmp_ret = collect('ctranslate2')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('faster_whisper')
+tmp_ret = collect('faster_whisper')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('nvidia.cublas')
+tmp_ret = collect('nvidia.cublas')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('nvidia.cudnn')
+tmp_ret = collect('nvidia.cudnn')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('whisper')
+tmp_ret = collect('whisper')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('tiktoken')
+tmp_ret = collect('tiktoken')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('crisperwhisper')
+tmp_ret = collect('crisperwhisper')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('transformers')
+tmp_ret = collect('transformers')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('tokenizers')
+tmp_ret = collect('tokenizers')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('accelerate')
+tmp_ret = collect('accelerate')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('soundfile')
+tmp_ret = collect('soundfile')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('soxr')
+tmp_ret = collect('soxr')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 # torch/torchaudio는 openai-whisper 엔진용으로 유지 (whisperx는 v1.6.1에서 제거됨)
-tmp_ret = collect_all('torch')
+tmp_ret = collect('torch')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('torchaudio')
+tmp_ret = collect('torchaudio')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 datas += copy_metadata('torchaudio')
 datas += copy_metadata('torch')
@@ -44,6 +53,13 @@ datas += copy_metadata('safetensors')
 datas += copy_metadata('crisperwhisper')
 datas += copy_metadata('huggingface_hub')
 datas += copy_metadata('numpy')
+# transformers 런타임이 참조하는 메타데이터 (contrib hook 커버 범위지만 load-bearing이라 명시)
+datas += copy_metadata('tqdm')
+datas += copy_metadata('regex')
+datas += copy_metadata('requests')
+datas += copy_metadata('packaging')
+datas += copy_metadata('filelock')
+datas += copy_metadata('pyyaml')
 
 
 a = Analysis(
@@ -60,6 +76,22 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+
+
+def _strip_buildtime_artifacts(entries):
+    """torch 정적 .lib / C++ 헤더는 런타임 무용 (~2.5GB) — 배포 번들에서 제외."""
+    out = []
+    for dest, src, kind in entries:
+        p = dest.replace('\\', '/')
+        if p.endswith('.lib') or p.startswith('torch/include/'):
+            continue
+        out.append((dest, src, kind))
+    return out
+
+
+a.datas = _strip_buildtime_artifacts(a.datas)
+a.binaries = _strip_buildtime_artifacts(a.binaries)
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
