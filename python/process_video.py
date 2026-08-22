@@ -568,9 +568,10 @@ def main():
     args = parser.parse_args()
 
     # 번들된 ffmpeg 경로를 전역으로 설정
+    # Windows CreateProcess는 슬래시 상대경로(bin/ffmpeg.exe)를 못 찾으므로 정규화 필수
     global FFMPEG_PATH, FFPROBE_PATH
-    FFMPEG_PATH = args.ffmpeg
-    ffmpeg_dir = os.path.dirname(args.ffmpeg)
+    FFMPEG_PATH = os.path.normpath(args.ffmpeg)
+    ffmpeg_dir = os.path.dirname(FFMPEG_PATH)
     FFPROBE_PATH = os.path.join(ffmpeg_dir, "ffprobe.exe") if ffmpeg_dir else "ffprobe"
 
     video_path = args.video_path
@@ -599,6 +600,8 @@ def main():
     # 임시 오디오 파일
     temp_dir = tempfile.gettempdir()
     audio_path = os.path.join(temp_dir, "subtitle_gen_temp.wav")
+
+    exit_code = 0
 
     try:
         # 1. 오디오 추출
@@ -635,9 +638,12 @@ def main():
             "device": device_label
         })
 
-    except SystemExit:
+    except SystemExit as e:
+        # 의도한 종료 코드를 finally의 os._exit까지 전달 (무음 영상 등 실패 시 1 보존)
+        exit_code = e.code if isinstance(e.code, int) else 1
         raise
     except BaseException as e:
+        exit_code = 1
         # os._exit가 finally에서 트레이스백을 삼키지 않도록 먼저 보고
         import traceback
         report("error", 0, f"처리 실패: {type(e).__name__}: {e}")
@@ -654,9 +660,9 @@ def main():
                 pass
 
         # CUDA 모델이 있으면 Python 정상 종료 과정에서 CUDA 소멸자 크래시 발생
-        # os._exit(0)으로 Python cleanup을 완전히 건너뛰어 크래시 방지
+        # os._exit로 Python cleanup을 건너뛰되 의도한 종료 코드는 보존
         if _whisper_model is not None:
-            os._exit(0)
+            os._exit(exit_code)
 
 
 if __name__ == "__main__":
