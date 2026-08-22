@@ -40,8 +40,9 @@ v1.6.0의 "무음 자막 금지" 요구사항과 직결. 정제(intended)/축어
 
 ### 파이프라인 (python/process_video.py)
 - `--engine`에 `crisperwhisper` 추가, `--cw-mode {intended,verbatim}` 신설 (기본 **intended** — 자막 가독성).
-- `--model` 선택지에 `large`, `turbo` 추가. 엔진별 정규화:
-  CW 경로 `large-v3→large, base/tiny→small`; whisper 경로 `large/turbo→large-v3`.
+- `--model` 선택지에 `large`, `turbo` 추가. CW 경로 정규화: `large-v3→large, base/tiny→small`.
+  (whisper 경로의 `large/turbo→large-v3` 리맵은 구현 중 제거 — faster-whisper·openai-whisper 모두
+  `turbo`/`large`를 네이티브 지원하므로 리맵은 turbo 무음 강등 회귀였음.)
 - `_transcribe_crisperwhisper()`: openai-whisper 경로와 같은 torch 기반 디바이스 감지,
   GPU 실패 시 VRAM 해제 후 CPU 재시도(기존 패턴). GPU=float16, CPU=float32.
 - `language == "auto"` → 경고 후 `"en"` 폴백 (UI에서도 차단).
@@ -56,7 +57,7 @@ v1.6.0의 "무음 자막 금지" 요구사항과 직결. 정제(intended)/축어
 - 모델 셀렉트를 엔진별 동적 구성 (CW: large 기본/turbo/medium/small ↔ Whisper: tiny~large-v3).
   모델 선택은 엔진별 localStorage 키(`setting:model-select@<engine>`)로 저장.
 - CW 선택 시에만 "전사 모드" 셀렉트 표시 (정제 기본/축어).
-- CW 선택 시 언어 "자동 감지" 옵션 비활성화, auto였다면 en으로 전환.
+- CW 선택 시 언어 "자동 감지" 옵션 비활성화, auto였다면 ko로 전환 (화면 표시 전용 — localStorage에는 저장하지 않아 다른 엔진으로 되돌리면 auto 복원). Python의 auto→en 폴백은 UI가 차단하므로 도달 불가한 방어선으로 유지.
 - `options.cwMode` → `--cw-mode` 인자 전달 (subtitle-operations.js).
 
 ### 엔진 v3 (재빌드 필요)

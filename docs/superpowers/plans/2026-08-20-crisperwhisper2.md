@@ -120,7 +120,7 @@ def cw_words_to_segments(words, full_text):
 - [ ] **Step 4: 테스트 통과 확인**
 
 Run: `python/.venv/Scripts/python.exe -m pytest python/tests -v`
-Expected: 신규 6건 + 기존 17건 전부 PASS
+Expected: 신규 5건 + 기존 17건 전부 PASS
 
 - [ ] **Step 5: 엔진 경로 구현** — `python/process_video.py`:
 
@@ -652,7 +652,7 @@ Expected: `2.0.2 4.57.6 2.8.0+cu128 True`
 - [ ] **Step 2: 전체 pytest**
 
 Run: `python/.venv/Scripts/python.exe -m pytest python/tests -v`
-Expected: 전부 PASS (기존 17건 + 신규 6건)
+Expected: 전부 PASS (기존 17건 + 신규 5건)
 
 - [ ] **Step 3: 테스트 비디오 생성** (스크래치 디렉토리에서, SAPI TTS + ffmpeg):
 
@@ -697,7 +697,7 @@ Expected: complete + SRT 생성
 
 ### Task 5: 엔진 v3 빌드 + exe 스모크 + dev bin 갱신
 
-**Files:** 빌드 산출물만 (`python/dist/`, `dist/engine-v3-release/`, `bin/` — 전부 gitignore 대상)
+**Files:** 빌드 산출물만 (`python/dist/`, `dist-engine/engine-v3-release/`, `bin/` — 전부 gitignore 대상)
 
 - [ ] **Step 1: 릴리스 빌드 실행** (10~30분 소요 가능):
 
@@ -705,7 +705,7 @@ Expected: complete + SRT 생성
 powershell -ExecutionPolicy Bypass -File scripts\build-engine-release.ps1
 ```
 
-Expected: `dist\engine-v3-release\` 에 `engine-manifest.json` + `engine.zip.NNN` 파트들
+Expected: `dist-engine\engine-v3-release\` 에 `engine-manifest.json` + `engine.zip.NNN` 파트들
 
 - [ ] **Step 2: exe 스모크 테스트** (빌드 직후 dist에서, 새 스크립트 지정):
 
@@ -745,3 +745,18 @@ Copy-Item -Force python\dist\process_video\process_video.exe bin\process_video.e
 - 스펙 커버리지: 파이프라인(T1), UI(T2), 엔진 v3·문서·라이선스 고지(T3), 검증(T4/T5) — 전부 매핑됨
 - 타입/시그니처 일관성: `cwMode`(JS) ↔ `--cw-mode`(CLI) ↔ `cw_mode`(Python); `cw_words_to_segments(words, full_text)` 테스트와 구현 일치
 - 릴리스 업로드는 의도적으로 범위 제외 (사용자 결정) — CHANGELOG와 빌드 스크립트 출력에 순서 명시
+
+---
+
+## 구현 결과 노트 (사후 기록, 2026-08-20)
+
+리뷰 과정에서 계획과 달라진 사항:
+
+- **turbo/large → large-v3 리맵 제거** (Task 1): faster-whisper·openai-whisper 모두 `turbo`/`large`를 네이티브 지원 — 리맵은 turbo 무음 강등 회귀라 삭제.
+- **재시도 구조 재설계** (Task 1): 언어/크기 정규화·모델 다운로드를 재시도 범위 밖으로, CPU 재시도는 except 블록 밖에서 실행(트레이스백의 GPU 모델 참조 해제), `_release_torch_vram`은 `_RELEASED` 센티널로 전역 non-None 유지(os._exit 가드 보존). 무발화 시 RuntimeError 대신 빈 목록 반환.
+- **UI 언어 폴백 en → ko, 표시 전용** (Task 2): localStorage 미저장으로 엔진 왕복 시 auto 복원. 구버전 엔진 디렉토리 자동 정리 + 설치 검증 게이트를 현재 버전 디렉토리 특정으로 강화.
+- **의존성 폐쇄 보강** (Task 3): requirements.txt에 openai-whisper/nvidia-cublas-cu12(<13)/nvidia-cudnn-cu12(<10) 추가, torch==2.8.0+cu128 정확 핀, 미사용 deep-translator 제거. spec은 미설치 패키지 하드 실패 `collect()` 헬퍼 + torch .lib/헤더 2.7GB 스트립. 산출물은 `dist-engine\`으로 분리.
+- **E2E가 잡은 기존 결함 2건 수정** (Task 4 후): ffmpeg 슬래시 상대경로 normpath 정규화, os._exit(0)이 SystemExit(1)을 삼키던 종료 코드 보존.
+- **한국어 포함 .ps1은 UTF-8 BOM 필수**: BOM 없으면 PowerShell 5.1이 CP949로 오독해 파싱 실패.
+
+검증 실측 (RTX 5060 8GB): CW large fp16 GPU 피크 VRAM 7,656/8,151MiB, 2초 무음 경계 분할 정상, intended/verbatim/faster-whisper 회귀/무음 exit 1 전부 통과.
