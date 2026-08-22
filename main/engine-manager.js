@@ -180,6 +180,9 @@ async function installEngine(onProgress) {
   report('manifest', 0, '엔진 정보 확인 중...');
   const manifest = await fetchJson(`${RELEASE_BASE}/engine-manifest.json`);
   // { version, totalSize, zipSha256, parts: [{name, size, sha256}] }
+  if (manifest.version !== undefined && Number(manifest.version) !== ENGINE_VERSION) {
+    throw new Error(`엔진 매니페스트 버전 불일치 (기대 v${ENGINE_VERSION}, 실제 v${manifest.version})`);
+  }
 
   const tmpDir = path.join(getEngineRoot(), 'tmp');
   fs.mkdirSync(tmpDir, { recursive: true });

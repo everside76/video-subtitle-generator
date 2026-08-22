@@ -161,33 +161,6 @@ function cancelProcessing() {
   return false;
 }
 
-function checkDependencies() {
-  return new Promise((resolve) => {
-    const exePath = getProcessVideoExe();
-    const ffmpegPath = getFfmpegPath();
-
-    const results = {
-      processVideo: fs.existsSync(exePath),
-      ffmpeg: fs.existsSync(ffmpegPath),
-    };
-
-    // process_video.exe가 실제로 실행되는지 확인
-    if (results.processVideo) {
-      const proc = spawn(exePath, ['--help'], { windowsHide: true });
-      proc.on('close', (code) => {
-        results.processVideo = code === 0;
-        resolve(results);
-      });
-      proc.on('error', () => {
-        results.processVideo = false;
-        resolve(results);
-      });
-    } else {
-      resolve(results);
-    }
-  });
-}
-
 /** 파일 존재 여부만 확인하는 빠른 버전 (시작 시 사용) */
 function checkDependenciesFast() {
   return {
@@ -196,4 +169,4 @@ function checkDependenciesFast() {
   };
 }
 
-module.exports = { processVideo, cancelProcessing, checkDependencies, checkDependenciesFast };
+module.exports = { processVideo, cancelProcessing, checkDependenciesFast };

@@ -501,6 +501,12 @@ const stageOrder = ['extracting', 'transcribing', 'generating'];
 ipcRenderer.on('processing-progress', (event, data) => {
   const { stage, progress, message } = data;
 
+  // 경고는 진행 단계가 아니므로 메시지만 갱신 (단계 표시/진행률 되돌림 방지)
+  if (stage === 'warning') {
+    if (message) progressMessage.textContent = message;
+    return;
+  }
+
   progressFill.style.width = progress + '%';
   if (message) progressMessage.textContent = message;
 
@@ -603,6 +609,7 @@ const CHANGELOG = [
           'CrisperWhisper 2.0 엔진 추가: 정밀 단어 타임스탬프',
           '전사 모드 선택: 정제(읽기 좋은 자막) / 축어(말한 그대로, 필러 포함)',
           '엔진별 모델 목록 표시 및 모델 설정 개별 저장',
+          'CrisperWhisper 모델 최초 다운로드 진행률 표시 (large 기준 약 3.1GB)',
         ],
       },
       {
@@ -612,6 +619,8 @@ const CHANGELOG = [
           '음성 인식 엔진 v3로 업데이트 — 최초 실행 시 엔진 재다운로드 필요',
           'CrisperWhisper 선택 시 언어 자동 감지 비활성화 (해당 엔진 미지원)',
           'CrisperWhisper 모델 가중치는 비상업 연구 라이선스 (상업적 사용은 별도 계약 필요)',
+          '엔진 설치 성공 시 이전 버전 엔진 디렉토리 자동 정리',
+          '엔진 번들에서 빌드타임 아티팩트 제거 — 설치 후 디스크 사용량 약 29% 감소',
         ],
       },
     ],
@@ -921,6 +930,8 @@ ipcRenderer.on('engine-progress', (event, { percent, message }) => {
 });
 
 engineInstallBtn.addEventListener('click', async () => {
+  // 설치 실패 시 안내문(용량/라이선스 고지)을 복원하기 위해 원본 보관
+  const originalHtml = engineMessage.innerHTML;
   engineInstallBtn.disabled = true;
   engineMessage.textContent = '엔진을 설치하는 동안 앱을 종료하지 마세요.';
   const result = await ipcRenderer.invoke('engine-install');
@@ -929,6 +940,7 @@ engineInstallBtn.addEventListener('click', async () => {
     showView('drop');
   } else {
     engineInstallBtn.disabled = false;
+    engineMessage.innerHTML = originalHtml;
     engineProgressMessage.textContent = '설치 실패: ' + (result.message || '알 수 없는 오류');
   }
 });
