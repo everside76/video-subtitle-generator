@@ -10,19 +10,23 @@ $root = Split-Path -Parent $PSScriptRoot
 $py = Join-Path $root 'python'
 
 Write-Host '=== 사전 검증 ==='
-$driveLetter = (Split-Path -Qualifier $root).TrimEnd(':')
-if ((Get-PSDrive -Name $driveLetter).Free -lt 25GB) { throw '디스크 여유 공간 부족 (최소 25GB 필요)' }
+$free = (Get-Item $root).PSDrive.Free
+if ($null -ne $free -and $free -lt 25GB) { throw '디스크 여유 공간 부족 (최소 25GB 필요)' }
 foreach ($f in 'ffmpeg.exe', 'ffprobe.exe') {
   if (-not (Test-Path (Join-Path $root "bin\$f"))) { throw "bin\$f 없음 — ffmpeg 바이너리를 bin\ 에 배치하세요" }
 }
 $tarExe = Join-Path $env:SystemRoot 'System32\tar.exe'
-if (-not (Test-Path $tarExe)) { throw 'tar.exe 없음 (Windows 10 17063+ 필요)' }
+if (-not (Test-Path $tarExe)) { throw 'tar.exe 없음 (Windows 10 17063+ / 64비트 PowerShell에서 실행하세요)' }
+$pyinstaller = Join-Path $py '.venv\Scripts\pyinstaller.exe'
+if (-not $SkipBuild -and -not (Test-Path $pyinstaller)) {
+  throw "pyinstaller.exe 없음: $pyinstaller — scripts\setup.bat으로 venv를 준비하세요"
+}
 
 if (-not $SkipBuild) {
   Write-Host '=== PyInstaller 빌드 ==='
   Push-Location $py
   try {
-    & (Join-Path $py '.venv\Scripts\pyinstaller.exe') --noconfirm process_video.spec
+    & $pyinstaller --noconfirm process_video.spec
     $code = $LASTEXITCODE
   } finally { Pop-Location }
   if ($code -ne 0) { throw "PyInstaller 실패 (exit $code)" }
@@ -31,6 +35,13 @@ if (-not $SkipBuild) {
 $dist = Join-Path $py 'dist\process_video'
 if (-not (Test-Path (Join-Path $dist 'process_video.exe'))) { throw '빌드 산출물 없음: python\dist\process_video' }
 
+Write-Host '=== 페이로드 검증 ==='
+foreach ($m in 'crisperwhisper', 'transformers', 'whisper', '_soundfile_data', 'nvidia\cublas', 'nvidia\cudnn') {
+  if (-not (Test-Path (Join-Path $dist "_internal\$m"))) {
+    throw "엔진 v$EngineVersion 페이로드 누락: _internal\$m — 스테일 빌드이거나 spec 수집 실패. -SkipBuild 없이 재빌드하세요."
+  }
+}
+
 Write-Host '=== 스테이징 (ffmpeg 포함) ==='
 $staging = Join-Path $root "dist-engine\engine-v$EngineVersion-staging"
 if (Test-Path $staging) { Remove-Item -Recurse -Force $staging }
@@ -38,13 +49,6 @@ New-Item -ItemType Directory -Force $staging | Out-Null
 Copy-Item -Recurse (Join-Path $dist '*') $staging
 Copy-Item (Join-Path $root 'bin\ffmpeg.exe') $staging
 Copy-Item (Join-Path $root 'bin\ffprobe.exe') $staging
-
-Write-Host '=== 페이로드 검증 ==='
-foreach ($m in 'crisperwhisper', 'transformers', 'whisper', 'nvidia\cublas', 'nvidia\cudnn') {
-  if (-not (Test-Path (Join-Path $staging "_internal\$m"))) {
-    throw "엔진 v$EngineVersion 페이로드 누락: _internal\$m — 스테일 빌드이거나 spec 수집 실패. -SkipBuild 없이 재빌드하세요."
-  }
-}
 
 Write-Host '=== 압축 (tar) ==='
 $outDir = Join-Path $root "dist-engine\engine-v$EngineVersion-release"
