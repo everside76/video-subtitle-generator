@@ -17,6 +17,7 @@ import atexit
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from subtitle_postprocess import postprocess
+from speech_filter import prepare_speech, restore_speech_segments, SAMPLE_RATE
 
 
 def _load_cuda_libs():
@@ -163,15 +164,25 @@ def extract_audio(video_path, audio_path):
     report("extracting", 15, "오디오 추출 완료")
 
 
-def transcribe_audio(audio_path, model_size="base", device="auto",
+def transcribe_audio(audio_path, model_size="large-v3", device="auto",
                      engine="faster-whisper", language="auto", cw_mode="intended"):
-    """음성 인식 (엔진 선택 가능)"""
+    """모든 엔진에서 실제 발화만 인식하고 원본 영상의 시간으로 복원."""
+    report("transcribing", 17, "발화 구간 확인 중... (무음 제외)")
+    audio, speech_chunks = prepare_speech(audio_path)
+    if not speech_chunks:
+        return [], language if language != "auto" else "unknown", "cpu"
+    report("transcribing", 19,
+           f"발화 {len(speech_chunks)}개 구간 확인 — 무음을 제외하고 인식합니다")
     if engine == "crisperwhisper":
-        return _transcribe_crisperwhisper(audio_path, model_size, device,
-                                          language, cw_mode)
-    if engine == "openai-whisper":
-        return _transcribe_openai(audio_path, model_size, device, language)
-    return _transcribe_faster(audio_path, model_size, device, language)
+        result = _transcribe_crisperwhisper(audio, model_size, device,
+                                           language, cw_mode)
+    elif engine == "openai-whisper":
+        result = _transcribe_openai(audio, model_size, device, language)
+    else:
+        result = _transcribe_faster(audio, model_size, device, language)
+    segments, detected_lang, used_device = result
+    segments = restore_speech_segments(segments, speech_chunks)
+    return segments, detected_lang, used_device
 
 
 def _transcribe_faster(audio_path, model_size="base", device="auto", language="auto"):
@@ -211,14 +222,16 @@ def _transcribe_faster_impl(audio_path, model_size, actual_device, compute_type,
     segments_gen, info = model.transcribe(
         audio_path,
         language=None if language == "auto" else language,
-        vad_filter=True,
-        vad_parameters={"min_silence_duration_ms": 500, "speech_pad_ms": 200},
+        # 공통 VAD가 이미 무음을 제거했으므로 중복 제거/시간축 변환 금지.
+        vad_filter=False,
         beam_size=5,
+        temperature=0.0,
         word_timestamps=True,
         condition_on_previous_text=False,
         compression_ratio_threshold=2.4,
         log_prob_threshold=-1.0,
         no_speech_threshold=0.6,
+        hallucination_silence_threshold=1.0,
     )
 
     detected_lang = info.language
@@ -231,12 +244,16 @@ def _transcribe_faster_impl(audio_path, model_size, actual_device, compute_type,
         words = []
         if seg.words:
             for wd in seg.words:
-                words.append({"word": wd.word, "start": wd.start, "end": wd.end})
+                words.append({"word": wd.word, "start": wd.start, "end": wd.end,
+                              "probability": wd.probability})
         segments.append({
             "start": seg.start,
             "end": seg.end,
             "text": seg.text.strip(),
             "words": words,
+            "avg_logprob": seg.avg_logprob,
+            "no_speech_prob": seg.no_speech_prob,
+            "compression_ratio": seg.compression_ratio,
         })
         if len(segments) % 10 == 0:
             report("transcribing", min(35 + len(segments) // 2, 65),
@@ -278,6 +295,13 @@ def _transcribe_openai(audio_path, model_size="base", device="auto", language="a
         verbose=False,
         word_timestamps=True,
         condition_on_previous_text=False,
+        beam_size=5,
+        temperature=0.0,
+        compression_ratio_threshold=2.4,
+        logprob_threshold=-1.0,
+        no_speech_threshold=0.6,
+        hallucination_silence_threshold=1.0,
+        fp16=actual_device == "cuda",
     )
 
     detected_lang = result.get("language", "unknown")
@@ -286,13 +310,17 @@ def _transcribe_openai(audio_path, model_size="base", device="auto", language="a
 
     segments = []
     for seg in result.get("segments", []):
-        words = [{"word": wd["word"], "start": wd["start"], "end": wd["end"]}
+        words = [{"word": wd["word"], "start": wd["start"], "end": wd["end"],
+                  "probability": wd.get("probability")}
                  for wd in seg.get("words", [])]
         segments.append({
             "start": seg["start"],
             "end": seg["end"],
             "text": seg["text"].strip(),
             "words": words,
+            "avg_logprob": seg.get("avg_logprob"),
+            "no_speech_prob": seg.get("no_speech_prob"),
+            "compression_ratio": seg.get("compression_ratio"),
         })
         if len(segments) % 10 == 0:
             report("transcribing", min(35 + len(segments) // 2, 65),
@@ -495,7 +523,9 @@ def _transcribe_crisperwhisper_impl(audio_path, cw_size, actual_device, language
         audio_path,
         language=language,
         mode=mode,
+        sr=SAMPLE_RATE,
         word_timestamps=True,
+        hallucination_mitigation=True,
     )
 
     segments = cw_words_to_segments(result.words or [], result.text or "")
@@ -561,7 +591,7 @@ def get_video_duration(video_path):
 def main():
     parser = argparse.ArgumentParser(description="비디오 자막 생성기")
     parser.add_argument("video_path", help="비디오 파일 경로")
-    parser.add_argument("--model", default="base",
+    parser.add_argument("--model", default="large-v3",
                         choices=["tiny", "base", "small", "medium", "large-v3",
                                  "large", "turbo"],
                         help="모델 크기 (Whisper: tiny~large-v3 / CrisperWhisper: large, turbo, medium, small)")

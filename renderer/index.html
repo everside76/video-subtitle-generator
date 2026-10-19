@@ -14,9 +14,11 @@
       <span id="app-version" class="version-badge" title="업데이트 이력 보기"></span>
     </div>
     <div class="header-actions">
+      <button id="update-action">업데이트 확인</button>
       <button id="settings-toggle">설정</button>
     </div>
   </div>
+  <div id="update-status" role="status" aria-live="polite"></div>
 
   <!-- Changelog Modal -->
   <div id="changelog-overlay">
@@ -104,7 +106,7 @@
         <div class="title">음성 인식 엔진 설치</div>
         <div class="dep-list" id="dep-list"></div>
         <div class="message" id="engine-message">
-          음성 인식 엔진(약 3GB 다운로드)이 설치되어 있지 않습니다.<br>
+          음성 인식 엔진(약 4.6GB 다운로드)이 설치되어 있지 않습니다.<br>
           최초 1회만 설치하면 이후 앱 업데이트는 자동으로 빠르게 진행됩니다.<br>
           <small>CrisperWhisper 2.0 모델은 비상업 연구 라이선스로 제공됩니다.</small>
         </div>

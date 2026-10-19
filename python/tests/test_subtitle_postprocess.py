@@ -109,13 +109,22 @@ def test_postprocess_drops_segment_without_words():
     segments = [{"start": 0.0, "end": 2.0, "text": "환각텍스트", "words": []}]
     assert postprocess(segments, "ko") == []
 
-def test_postprocess_min_duration_extension():
+def test_postprocess_short_word_does_not_extend_into_unknown_silence():
     segments = [{
         "start": 0.0, "end": 0.4, "text": "네",
         "words": [w("네", 0.0, 0.4)],
     }]
     subs = postprocess(segments, "ko")
-    assert subs[0]["end"] - subs[0]["start"] >= 0.8
+    assert subs[0]["end"] == 0.4
+
+
+def test_postprocess_min_duration_extension_stays_inside_detected_speech():
+    segments = [{
+        "start": 0.0, "end": 0.4, "text": "네",
+        "words": [{**w("네", 0.0, 0.4), "speech_region": 0, "speech_end": 0.6}],
+    }]
+    subs = postprocess(segments, "ko")
+    assert subs[0]["end"] == 0.6
 
 def test_postprocess_extension_capped_by_next_subtitle():
     segments = [{

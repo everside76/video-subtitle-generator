@@ -1,11 +1,12 @@
 {
   "name": "video-subtitle-generator",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "비디오 자막 생성기 - 음성 인식",
   "author": "evers",
   "main": "main/main.js",
   "scripts": {
     "start": "electron .",
+    "test": "node --test main/tests/*.test.js",
     "build": "electron-builder --win",
     "setup": "scripts\\setup.bat"
   },
@@ -34,6 +35,7 @@
     },
     "files": [
       "main/**/*",
+      "!main/tests/**/*",
       "renderer/**/*",
       "assets/**/*",
       "node_modules/**/*"

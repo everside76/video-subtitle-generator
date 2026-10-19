@@ -64,6 +64,13 @@ function processVideo(videoPath, options, onProgress, onComplete, onError) {
   currentProcess = proc;
   let buffer = '';
   let completed = false;  // complete 메시지를 받았는지 추적
+  let failed = false;
+  const fail = (error) => {
+    if (completed || failed) return;
+    failed = true;
+    if (currentProcess === proc) currentProcess = null;
+    onError(error);
+  };
 
   proc.stdout.on('data', (data) => {
     buffer += data.toString('utf-8');
@@ -75,12 +82,12 @@ function processVideo(videoPath, options, onProgress, onComplete, onError) {
       try {
         const msg = JSON.parse(line);
         if (msg.stage === 'complete') {
+          if (failed || completed) continue;
           completed = true;
           currentProcess = null;
           finishWithTranslation(msg.result, options, onProgress, onComplete);
         } else if (msg.stage === 'error') {
-          currentProcess = null;
-          onError(new Error(msg.message));
+          fail(new Error(msg.message));
         } else {
           onProgress(msg);
         }
@@ -106,19 +113,18 @@ function processVideo(videoPath, options, onProgress, onComplete, onError) {
   });
 
   proc.on('close', (code) => {
-    currentProcess = null;
+    if (currentProcess === proc) currentProcess = null;
     if (logStream) logStream.end(`\n[exit code: ${code}]\n`);
     // 이미 complete를 받았으면 종료 코드 무시 (CUDA 정리 시 크래시 가능)
-    if (!completed && code !== 0 && code !== null) {
+    if (!completed && !failed) {
       const tail = stderrTail.trim().split('\n').slice(-3).join('\n');
-      onError(new Error(
-        `프로세스가 종료되었습니다 (코드: ${code})${tail ? '\n' + tail : ''}`));
+      fail(new Error(code === null ? '작업이 취소되었습니다.'
+        : `완료 결과 없이 프로세스가 종료되었습니다 (코드: ${code})${tail ? '\n' + tail : ''}`));
     }
   });
 
   proc.on('error', (err) => {
-    currentProcess = null;
-    onError(err);
+    fail(err);
   });
 
   return proc;

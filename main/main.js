@@ -3,9 +3,13 @@ const path = require('path');
 const fs = require('fs');
 const subtitleOps = require('./subtitle-operations');
 const engineManager = require('./engine-manager');
+const { createAppUpdater } = require('./app-updater');
 
 let mainWindow;
 let splashWindow;
+let appUpdater;
+let activeJobs = 0;
+let queueRunning = false;
 
 function createSplashWindow() {
   splashWindow = new BrowserWindow({
@@ -85,6 +89,10 @@ function getMenuTemplate() {
         { label: '새로 고침', accelerator: 'F5', click: () => mainWindow.webContents.reload() },
       ],
     },
+    {
+      label: '도움말',
+      submenu: [{ label: '업데이트 확인', click: () => appUpdater?.check() }],
+    },
   ];
 }
 
@@ -104,30 +112,42 @@ ipcMain.handle('open-video-files', async () => {
 
 // IPC: 비디오 처리 시작
 ipcMain.handle('process-video', async (event, { videoPath, options }) => {
-  return new Promise((resolve, reject) => {
-    subtitleOps.processVideo(
-      videoPath,
-      options || {},
-      (progress) => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('processing-progress', progress);
+  if (appUpdater?.getStatus().state === 'installing') throw new Error('업데이트를 적용하고 있습니다.');
+  activeJobs++;
+  try {
+    return await new Promise((resolve, reject) => {
+      subtitleOps.processVideo(
+        videoPath,
+        options || {},
+        (progress) => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('processing-progress', progress);
+          }
+        },
+        (result) => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('processing-complete', result);
+          }
+          resolve(result);
+        },
+        (error) => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('processing-error', { message: error.message });
+          }
+          reject(error);
         }
-      },
-      (result) => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('processing-complete', result);
-        }
-        resolve(result);
-      },
-      (error) => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('processing-error', { message: error.message });
-        }
-        reject(error);
-      }
-    );
-  });
+      );
+    });
+  } finally {
+    activeJobs--;
+  }
 });
+
+ipcMain.on('queue-running', (_event, running) => { queueRunning = running === true; });
+ipcMain.handle('app-update-status', () => appUpdater?.getStatus() || { state: 'disabled' });
+ipcMain.handle('app-update-check', () => appUpdater?.check() || { state: 'disabled' });
+ipcMain.handle('app-update-install', () => appUpdater?.install()
+  || { ok: false, message: '설치된 앱에서 업데이트를 사용할 수 있습니다.' });
 
 // IPC: 처리 취소
 ipcMain.handle('cancel-processing', () => {
@@ -163,6 +183,9 @@ ipcMain.handle('engine-status', () => {
 // IPC: 엔진 다운로드 + 설치
 let engineInstalling = false;
 ipcMain.handle('engine-install', async () => {
+  if (appUpdater?.getStatus().state === 'installing') {
+    return { ok: false, message: '업데이트를 적용하고 있습니다.' };
+  }
   if (engineInstalling) return { ok: false, message: '이미 설치 진행 중입니다.' };
   engineInstalling = true;
   try {
@@ -181,42 +204,21 @@ ipcMain.handle('engine-install', async () => {
 
 // ===== 앱 자동 업데이트 (GitHub Releases) =====
 function setupAutoUpdater() {
-  if (!app.isPackaged) return; // 개발 모드에서는 비활성화
   let autoUpdater;
-  try {
+  if (app.isPackaged) {
     ({ autoUpdater } = require('electron-updater'));
-  } catch {
-    return; // electron-updater 미설치 환경
   }
-
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
-
-  autoUpdater.on('update-available', (info) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('app-update', { state: 'downloading', version: info.version });
-    }
+  appUpdater = createAppUpdater({
+    updater: autoUpdater,
+    packaged: app.isPackaged,
+    isBusy: () => activeJobs > 0 || queueRunning || engineInstalling,
+    notify: (status) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('app-update', status);
+      }
+    },
   });
-
-  autoUpdater.on('update-downloaded', (info) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('app-update', { state: 'ready', version: info.version });
-    }
-    dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: '업데이트 준비 완료',
-      message: `새 버전 v${info.version}이 다운로드되었습니다.`,
-      detail: '지금 재시작하여 적용하거나, 다음 실행 시 자동으로 적용됩니다.',
-      buttons: ['지금 재시작', '나중에'],
-      defaultId: 0,
-    }).then(({ response }) => {
-      if (response === 0) autoUpdater.quitAndInstall();
-    });
-  });
-
-  autoUpdater.on('error', () => { /* 네트워크 오류 등은 조용히 무시 */ });
-
-  autoUpdater.checkForUpdates().catch(() => {});
+  appUpdater.start();
 }
 
 app.whenReady().then(() => {
@@ -228,6 +230,8 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   app.quit();
 });
+
+app.on('before-quit', () => appUpdater?.stop());
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {

@@ -37,6 +37,7 @@ let isRunning = false;    // 큐 순차 처리 중인지
 let stopRequested = false;
 let selectedItemId = null;
 let currentProcessingId = null;
+let appUpdateStatus = { state: 'idle' };
 
 // ===== 설정 영속화 =====
 const SETTING_IDS = ['engine-select', 'device-select', 'language-select', 'translate-select', 'cw-mode-select'];
@@ -334,6 +335,8 @@ function updateButtons() {
   queueStartBtn.disabled = !hasPending || isRunning;
   queueStopBtn.disabled = !isRunning;
   queueClearBtn.disabled = isRunning;
+  ipcRenderer.send('queue-running', isRunning);
+  renderUpdateStatus(appUpdateStatus);
 }
 
 // ===== 파일 추가 (드래그앤드롭 / 클릭 / 메뉴) =====
@@ -598,6 +601,22 @@ newVideoBtn.addEventListener('click', () => {
 const APP_VERSION = require(path.join(__dirname, '..', 'package.json')).version;
 
 const CHANGELOG = [
+  {
+    version: '1.9.0',
+    date: '2026-10-20',
+    sections: [
+      { title: 'Fixed', type: 'fixed', items: [
+        '모든 엔진에서 실제 발화만 인식 — 무음 구간의 임의 자막 억제',
+        '무음 경계를 넘는 자막 병합과 표시 시간 연장 방지',
+        '음성 인식 신뢰도 검증 및 안정적인 인식 설정 적용',
+      ] },
+      { title: 'Added', type: 'added', items: [
+        '시작 시·4시간마다 자동 업데이트 확인 및 다운로드 진행률 표시',
+        '업데이트 확인·재시작 버튼과 네트워크 오류 후 재시도',
+        '자막 생성·번역·엔진 설치 중 업데이트 재시작 방지',
+      ] },
+    ],
+  },
   {
     version: '1.8.0',
     date: '2026-08-20',
@@ -945,17 +964,46 @@ engineInstallBtn.addEventListener('click', async () => {
   }
 });
 
-// ===== 앱 자동 업데이트 상태 표시 =====
-ipcRenderer.on('app-update', (event, { state, version }) => {
-  if (state === 'downloading') {
-    appVersion.textContent = `v${APP_VERSION} → v${version} 받는 중`;
-  } else if (state === 'ready') {
-    appVersion.textContent = `v${APP_VERSION} → v${version} 준비됨`;
+// ===== 앱 자동 업데이트 =====
+function renderUpdateStatus(status) {
+  appUpdateStatus = status;
+  const action = document.getElementById('update-action');
+  const label = document.getElementById('update-status');
+  const messages = {
+    idle: '',
+    disabled: '자동 업데이트는 설치된 앱에서 사용할 수 있습니다.',
+    checking: '새 버전을 확인하고 있습니다...',
+    current: `현재 v${APP_VERSION}이 최신 버전입니다.`,
+    downloading: `v${status.version} 다운로드 중... ${Math.round(status.percent || 0)}%`,
+    ready: isRunning ? `v${status.version} 준비 완료 — 작업을 마친 뒤 재시작할 수 있습니다.`
+      : `v${status.version} 준비 완료 — 재시작하거나 앱을 종료하면 적용됩니다.`,
+    installing: '업데이트를 적용하기 위해 재시작합니다...',
+    error: '업데이트 확인 또는 다운로드에 실패했습니다. 다시 시도할 수 있습니다.',
+  };
+  label.textContent = messages[status.state] || '';
+  label.title = status.message || '';
+  action.textContent = status.state === 'ready' ? '재시작하여 업데이트' : '업데이트 확인';
+  action.disabled = ['disabled', 'checking', 'downloading', 'installing'].includes(status.state)
+    || (status.state === 'ready' && isRunning);
+}
+
+ipcRenderer.on('app-update', (_event, status) => renderUpdateStatus(status));
+document.getElementById('update-action').addEventListener('click', async () => {
+  try {
+    if (appUpdateStatus.state === 'ready') {
+      const result = await ipcRenderer.invoke('app-update-install');
+      if (!result.ok) document.getElementById('update-status').textContent = result.message;
+    } else {
+      renderUpdateStatus(await ipcRenderer.invoke('app-update-check'));
+    }
+  } catch (error) {
+    renderUpdateStatus({ state: 'error', message: error.message });
   }
 });
 
 // ===== 초기화 =====
 async function init() {
+  renderUpdateStatus(await ipcRenderer.invoke('app-update-status'));
   const deps = await ipcRenderer.invoke('check-dependencies');
 
   if (!deps.processVideo || !deps.ffmpeg) {

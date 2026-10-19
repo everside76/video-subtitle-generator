@@ -44,7 +44,8 @@ def split_at_gaps(words, gap=GAP_SPLIT):
     groups = []
     current = []
     for w in words:
-        if current and w["start"] - current[-1]["end"] >= gap:
+        if current and (w["start"] - current[-1]["end"] >= gap
+                        or w.get("speech_region") != current[-1].get("speech_region")):
             groups.append(current)
             current = []
         current.append(w)
@@ -87,7 +88,8 @@ def enforce_limits(groups, max_duration=MAX_DURATION,
             combined = g[-1]["end"] - prev[0]["start"]
             # 앞뒤 어느 쪽이든 너무 짧으면 인접 그룹과 병합
             if ((cur_dur < min_duration or prev_dur < min_duration)
-                    and gap <= merge_gap and combined <= max_duration):
+                    and gap <= merge_gap and combined <= max_duration
+                    and prev[-1].get("speech_region") == g[0].get("speech_region")):
                 merged[-1] = prev + g
                 continue
         merged.append(g)
@@ -157,12 +159,14 @@ def postprocess(segments, lang):
         all_words.extend(fill_missing_timestamps(seg["words"]))
 
     subs = []
+    all_words.sort(key=lambda w: (w["start"], w["end"]))
     groups = enforce_limits(split_at_gaps(all_words))
     for i, g in enumerate(groups):
         start, end = g[0]["start"], g[-1]["end"]
         if end - start < MIN_DURATION:
-            # 다음 자막 시작 직전까지만 연장
+            # 가독성보다 발화 경계가 우선: 무음/영상 끝까지 늘리지 않는다.
             limit = groups[i + 1][0]["start"] if i + 1 < len(groups) else float("inf")
+            limit = min(limit, g[-1].get("speech_end", end))
             end = min(start + MIN_DURATION, limit)
         text = join_words(g, lang)
         if not text:
