@@ -49,7 +49,6 @@ def unreliable_segment(segment):
 
     A high no-speech probability alone also occurs on real quiet speech;
     repetition alone can be intentional. Require weak recognition as well.
-    CrisperWhisper has no equivalent scores, so it uses the shared VAD gate.
     """
     logprob = segment.get("avg_logprob")
     no_speech = segment.get("no_speech_prob")

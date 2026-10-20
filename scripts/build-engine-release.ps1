@@ -1,7 +1,7 @@
 ﻿# 엔진 릴리스 패키징: PyInstaller 빌드 → ffmpeg 포함 스테이징 → zip → 파트 분할 + SHA256 매니페스트
 # 사용: powershell -ExecutionPolicy Bypass -File scripts\build-engine-release.ps1 [-SkipBuild]
 param(
-  [int]$EngineVersion = 3,
+  [int]$EngineVersion = 4,
   [ValidateRange(1MB, 100GB)][long]$PartSize = 1900MB,
   [switch]$SkipBuild
 )
@@ -45,9 +45,14 @@ $dist = Join-Path $py 'dist\process_video'
 if (-not (Test-Path (Join-Path $dist 'process_video.exe'))) { throw '빌드 산출물 없음: python\dist\process_video' }
 
 Write-Host '=== 페이로드 검증 ==='
-foreach ($m in 'crisperwhisper', 'transformers', 'whisper', '_soundfile_data', 'nvidia\cublas', 'nvidia\cudnn') {
+foreach ($m in 'faster_whisper', 'whisper', 'nvidia\cublas', 'nvidia\cudnn') {
   if (-not (Test-Path (Join-Path $dist "_internal\$m"))) {
     throw "엔진 v$EngineVersion 페이로드 누락: _internal\$m — 스테일 빌드이거나 spec 수집 실패. -SkipBuild 없이 재빌드하세요."
+  }
+}
+foreach ($m in 'crisperwhisper', 'transformers', 'accelerate', 'torchaudio', 'torchcodec') {
+  if (Test-Path (Join-Path $dist "_internal\$m")) {
+    throw "제거된 엔진 의존성이 번들에 남아 있습니다: $m"
   }
 }
 

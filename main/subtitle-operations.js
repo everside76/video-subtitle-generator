@@ -45,7 +45,6 @@ function processVideo(videoPath, options, onProgress, onComplete, onError) {
     '--ffmpeg', getFfmpegPath(),
     '--device', options.device || 'auto',
     '--language', options.language || 'auto',
-    '--cw-mode', options.cwMode || 'intended',
   ];
 
   if (options.output) {

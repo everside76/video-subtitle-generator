@@ -38,20 +38,12 @@
       <select id="engine-select">
         <option value="faster-whisper" selected>faster-whisper (CTranslate2, 최고 성능)</option>
         <option value="openai-whisper">openai-whisper (PyTorch, 원본)</option>
-        <option value="crisperwhisper">CrisperWhisper 2.0 (정밀 타임스탬프)</option>
       </select>
     </label>
     <label>
       모델:
       <!-- 옵션은 app.js의 ENGINE_MODELS로 엔진별 구성됨 -->
       <select id="model-select"></select>
-    </label>
-    <label id="cw-mode-label" style="display:none;">
-      전사 모드:
-      <select id="cw-mode-select">
-        <option value="intended" selected>정제 (읽기 좋은 자막)</option>
-        <option value="verbatim">축어 (말한 그대로, 필러 포함)</option>
-      </select>
     </label>
     <label>
       처리 장치:
@@ -106,9 +98,8 @@
         <div class="title">음성 인식 엔진 설치</div>
         <div class="dep-list" id="dep-list"></div>
         <div class="message" id="engine-message">
-          음성 인식 엔진(약 4.6GB 다운로드)이 설치되어 있지 않습니다.<br>
+          음성 인식 엔진이 설치되어 있지 않습니다.<br>
           최초 1회만 설치하면 이후 앱 업데이트는 자동으로 빠르게 진행됩니다.<br>
-          <small>CrisperWhisper 2.0 모델은 비상업 연구 라이선스로 제공됩니다.</small>
         </div>
         <div class="engine-progress" id="engine-progress-wrap" style="display:none; width:80%; max-width:420px; margin:12px auto;">
           <div class="progress-bar-track">

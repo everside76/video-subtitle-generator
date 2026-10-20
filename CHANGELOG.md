@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.9.1] - 2026-10-20
+
+### Removed
+- CrisperWhisper 엔진, 전용 모델 목록·전사 모드·다운로드·재시도 코드 및 관련 의존성 제거
+- 엔진 v4는 faster-whisper와 OpenAI Whisper만 포함
+
+### Fixed
+- 제거된 엔진의 저장된 설정을 faster-whisper로 전환하고 전용 설정 정리
+- 무음 구간 억제와 자동 업데이트 기능 유지
+
 ## [1.9.0] - 2026-10-20
 
 ### Added

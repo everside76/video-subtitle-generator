@@ -27,33 +27,16 @@ tmp_ret = collect('whisper')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect('tiktoken')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect('crisperwhisper')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect('transformers')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect('tokenizers')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect('accelerate')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect('soundfile')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect('soxr')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-# torch/torchaudio는 openai-whisper 엔진용으로 유지 (whisperx는 v1.6.1에서 제거됨)
+# PyTorch is required by OpenAI Whisper; audio decoding uses PyAV/ffmpeg.
 tmp_ret = collect('torch')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect('torchaudio')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-datas += copy_metadata('torchaudio')
 datas += copy_metadata('torch')
-datas += copy_metadata('transformers')
 datas += copy_metadata('tokenizers')
-datas += copy_metadata('accelerate')
-datas += copy_metadata('safetensors')
-datas += copy_metadata('crisperwhisper')
 datas += copy_metadata('huggingface_hub')
 datas += copy_metadata('numpy')
-# transformers 런타임이 참조하는 메타데이터 (contrib hook 커버 범위지만 load-bearing이라 명시)
+# Runtime package metadata.
 datas += copy_metadata('tqdm')
 datas += copy_metadata('regex')
 datas += copy_metadata('requests')
@@ -71,11 +54,11 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    # Audio is decoded by PyAV/ffmpeg and passed as numpy arrays. An optional
-    # torchcodec module collected transitively without metadata makes
-    # transformers AutoProcessor fail during import in the frozen runtime.
-    excludes=['whisperx', 'torchcodec', 'pytorch_lightning', 'lightning_fabric', 'torchvision',
-              'matplotlib', 'pandas', 'sklearn', 'IPython', 'jedi'],
+    # Prevent optional converter/audio imports from restoring retired engines.
+    excludes=['whisperx', 'crisperwhisper', 'transformers', 'accelerate',
+              'torchaudio', 'torchcodec', 'torchvision', 'soundfile', 'soxr',
+              'pytorch_lightning', 'lightning_fabric', 'matplotlib', 'pandas',
+              'sklearn', 'IPython', 'jedi'],
     noarchive=False,
     optimize=0,
 )

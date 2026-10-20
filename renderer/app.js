@@ -40,7 +40,7 @@ let currentProcessingId = null;
 let appUpdateStatus = { state: 'idle' };
 
 // ===== 설정 영속화 =====
-const SETTING_IDS = ['engine-select', 'device-select', 'language-select', 'translate-select', 'cw-mode-select'];
+const SETTING_IDS = ['engine-select', 'device-select', 'language-select', 'translate-select'];
 
 // 모델 목록은 엔진마다 다르므로 별도 관리 (설정도 엔진별로 저장)
 const ENGINE_MODELS = {
@@ -58,20 +58,13 @@ const ENGINE_MODELS = {
     ['medium', 'medium (높은 정확도)'],
     ['large-v3', 'large-v3 (최고 정확도)'],
   ],
-  'crisperwhisper': [
-    ['large', 'large (최고 정확도)'],
-    ['turbo', 'turbo (빠름)'],
-    ['medium', 'medium (균형)'],
-    ['small', 'small (가벼움)'],
-  ],
 };
 const ENGINE_DEFAULT_MODEL = {
   'faster-whisper': 'large-v3',
   'openai-whisper': 'large-v3',
-  'crisperwhisper': 'large',
 };
 
-// 엔진에 맞춰 모델 목록/전사 모드/언어 제약 동기화
+// 엔진에 맞춰 모델 목록 동기화
 function syncEngineUI() {
   const engine = document.getElementById('engine-select').value;
   const modelSel = document.getElementById('model-select');
@@ -89,22 +82,6 @@ function syncEngineUI() {
   modelSel.value = values.includes(saved)
     ? saved : (ENGINE_DEFAULT_MODEL[engine] || values[0]);
 
-  // CrisperWhisper 전용 전사 모드 표시
-  document.getElementById('cw-mode-label').style.display =
-    engine === 'crisperwhisper' ? '' : 'none';
-
-  // CrisperWhisper는 언어 자동 감지 미지원
-  const langSel = document.getElementById('language-select');
-  const autoOpt = [...langSel.options].find((o) => o.value === 'auto');
-  if (autoOpt) autoOpt.disabled = engine === 'crisperwhisper';
-  if (engine === 'crisperwhisper') {
-    if (langSel.value === 'auto') langSel.value = 'ko'; // 표시만 변경, 저장 안 함
-  } else {
-    const savedLang = localStorage.getItem('setting:language-select');
-    if (savedLang && [...langSel.options].some((o) => o.value === savedLang)) {
-      langSel.value = savedLang;
-    }
-  }
 }
 
 // 기존 단일 모델 설정을 엔진별 키로 1회 이전
@@ -121,11 +98,22 @@ function migrateModelSetting() {
 }
 
 function loadSettings() {
+  // Retired engine settings must not select an unavailable runtime after update.
+  localStorage.removeItem('setting:cw-mode-select');
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith('setting:model-select@')
+        && !Object.hasOwn(ENGINE_MODELS, key.slice('setting:model-select@'.length))) {
+      localStorage.removeItem(key);
+    }
+  }
   SETTING_IDS.forEach(id => {
     const el = document.getElementById(id);
     const saved = localStorage.getItem('setting:' + id);
     if (saved !== null && [...el.options].some(o => o.value === saved)) {
       el.value = saved;
+    } else if (id === 'engine-select' && saved !== null) {
+      el.value = 'faster-whisper';
+      localStorage.setItem('setting:' + id, el.value);
     }
     el.addEventListener('change', () => {
       localStorage.setItem('setting:' + id, el.value);
@@ -446,7 +434,6 @@ async function startQueue() {
       device: document.getElementById('device-select').value,
       language: document.getElementById('language-select').value,
       translate: document.getElementById('translate-select').value,
-      cwMode: document.getElementById('cw-mode-select').value,
     };
 
     try {
@@ -602,6 +589,18 @@ const APP_VERSION = require(path.join(__dirname, '..', 'package.json')).version;
 
 const CHANGELOG = [
   {
+    version: '1.9.1',
+    date: '2026-10-20',
+    sections: [
+      { title: 'Changed', type: 'changed', items: [
+        '음성 인식 엔진을 faster-whisper와 OpenAI Whisper 두 가지로 정리',
+        '사용하지 않는 엔진과 전용 모델·전사 모드·의존성 제거',
+        '이전 엔진 설정을 기본 엔진으로 자동 전환',
+        '무음 억제와 자동 업데이트 기능 유지',
+      ] },
+    ],
+  },
+  {
     version: '1.9.0',
     date: '2026-10-20',
     sections: [
@@ -615,33 +614,6 @@ const CHANGELOG = [
         '업데이트 확인·재시작 버튼과 네트워크 오류 후 재시도',
         '자막 생성·번역·엔진 설치 중 업데이트 재시작 방지',
       ] },
-    ],
-  },
-  {
-    version: '1.8.0',
-    date: '2026-08-20',
-    sections: [
-      {
-        title: 'Added',
-        type: 'added',
-        items: [
-          'CrisperWhisper 2.0 엔진 추가: 정밀 단어 타임스탬프',
-          '전사 모드 선택: 정제(읽기 좋은 자막) / 축어(말한 그대로, 필러 포함)',
-          '엔진별 모델 목록 표시 및 모델 설정 개별 저장',
-          'CrisperWhisper 모델 최초 다운로드 진행률 표시 (large 기준 약 3.1GB)',
-        ],
-      },
-      {
-        title: 'Changed',
-        type: 'changed',
-        items: [
-          '음성 인식 엔진 v3로 업데이트 — 최초 실행 시 엔진 재다운로드 필요',
-          'CrisperWhisper 선택 시 언어 자동 감지 비활성화 (해당 엔진 미지원)',
-          'CrisperWhisper 모델 가중치는 비상업 연구 라이선스 (상업적 사용은 별도 계약 필요)',
-          '엔진 설치 성공 시 이전 버전 엔진 디렉토리 자동 정리',
-          '엔진 번들에서 빌드타임 아티팩트 제거 — 설치 후 디스크 사용량 약 29% 감소',
-        ],
-      },
     ],
   },
   {

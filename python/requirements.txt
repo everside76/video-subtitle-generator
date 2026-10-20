@@ -1,8 +1,6 @@
 --extra-index-url https://download.pytorch.org/whl/cu128
 faster-whisper>=1.2.1
 openai-whisper>=20250625
-crisperwhisper[transformers]>=2.0.2
 nvidia-cublas-cu12>=12.8,<13
 nvidia-cudnn-cu12>=9,<10
 torch==2.8.0+cu128
-torchaudio==2.8.0+cu128

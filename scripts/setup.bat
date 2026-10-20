@@ -35,7 +35,6 @@ echo 설치 확인 중...
 python -c "from faster_whisper import WhisperModel; print('[OK] faster-whisper')"
 python -c "import whisper; print('[OK] openai-whisper')"
 python -c "import torch; print('[OK] torch', torch.__version__, 'CUDA:', torch.cuda.is_available())"
-python -c "import crisperwhisper; print('[OK] crisperwhisper', crisperwhisper.__version__)"
 
 echo.
 echo === 설치 완료! ===

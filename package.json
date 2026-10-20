@@ -1,6 +1,6 @@
 {
   "name": "video-subtitle-generator",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "description": "비디오 자막 생성기 - 음성 인식",
   "author": "evers",
   "main": "main/main.js",
@@ -20,7 +20,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "signAndEditExecutable": false
@@ -44,7 +46,9 @@
       {
         "from": "python",
         "to": "engine-scripts",
-        "filter": ["*.py"]
+        "filter": [
+          "*.py"
+        ]
       }
     ],
     "asar": true,

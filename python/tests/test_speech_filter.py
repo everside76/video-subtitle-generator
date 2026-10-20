@@ -122,7 +122,6 @@ def test_fallback_segment_cannot_bridge_removed_silence():
 @pytest.mark.parametrize("engine,implementation", [
     ("faster-whisper", "_transcribe_faster"),
     ("openai-whisper", "_transcribe_openai"),
-    ("crisperwhisper", "_transcribe_crisperwhisper"),
 ])
 def test_every_engine_receives_only_speech_and_returns_original_times(
         monkeypatch, engine, implementation):
@@ -141,7 +140,7 @@ def test_every_engine_receives_only_speech_and_returns_original_times(
     assert (lang, device) == ("en", "cpu")
 
 
-@pytest.mark.parametrize("engine", ["faster-whisper", "openai-whisper", "crisperwhisper"])
+@pytest.mark.parametrize("engine", ["faster-whisper", "openai-whisper"])
 def test_silent_recording_never_loads_any_recognition_model(monkeypatch, engine):
     monkeypatch.setattr(process_video, "prepare_speech",
                         lambda path: (np.empty(0, dtype=np.float32), []))
@@ -149,7 +148,7 @@ def test_silent_recording_never_loads_any_recognition_model(monkeypatch, engine)
     def forbidden(*args, **kwargs):
         pytest.fail("A recognition model must not be loaded on silence")
 
-    for implementation in ("_transcribe_faster", "_transcribe_openai", "_transcribe_crisperwhisper"):
+    for implementation in ("_transcribe_faster", "_transcribe_openai"):
         monkeypatch.setattr(process_video, implementation, forbidden)
     output, lang, _device = process_video.transcribe_audio("silent.wav", engine=engine)
     assert output == []
@@ -181,3 +180,11 @@ def test_real_vad_rejects_non_speech_audio(tmp_path, signal):
     audio, speech = prepare_speech(str(path))
     assert speech == []
     assert audio.size == 0
+
+
+def test_unknown_engine_is_rejected_before_loading_audio(monkeypatch):
+    def forbidden(*args):
+        pytest.fail("An unsupported engine must fail before loading input")
+    monkeypatch.setattr(process_video, "prepare_speech", forbidden)
+    with pytest.raises(ValueError, match="retired-engine"):
+        process_video.transcribe_audio("input.wav", engine="retired-engine")

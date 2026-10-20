@@ -17,7 +17,7 @@ import atexit
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from subtitle_postprocess import postprocess
-from speech_filter import prepare_speech, restore_speech_segments, SAMPLE_RATE
+from speech_filter import prepare_speech, restore_speech_segments
 
 
 def _load_cuda_libs():
@@ -94,10 +94,6 @@ _load_cuda_libs()
 # CUDA 모델을 프로세스 종료까지 유지 (GC에 의한 CUDA 크래시 방지)
 _whisper_model = None
 
-# VRAM 해제 후 종료 가드용으로 남기는 센티널 (가중치는 버리되 non-None 유지)
-_RELEASED = object()
-
-
 def _safe_exit():
     """프로세스 종료 시 GC를 비활성화하여 CUDA 객체 소멸자 크래시 방지"""
     gc.disable()
@@ -165,18 +161,17 @@ def extract_audio(video_path, audio_path):
 
 
 def transcribe_audio(audio_path, model_size="large-v3", device="auto",
-                     engine="faster-whisper", language="auto", cw_mode="intended"):
+                     engine="faster-whisper", language="auto"):
     """모든 엔진에서 실제 발화만 인식하고 원본 영상의 시간으로 복원."""
+    if engine not in ("faster-whisper", "openai-whisper"):
+        raise ValueError(f"지원하지 않는 음성 인식 엔진: {engine}")
     report("transcribing", 17, "발화 구간 확인 중... (무음 제외)")
     audio, speech_chunks = prepare_speech(audio_path)
     if not speech_chunks:
         return [], language if language != "auto" else "unknown", "cpu"
     report("transcribing", 19,
            f"발화 {len(speech_chunks)}개 구간 확인 — 무음을 제외하고 인식합니다")
-    if engine == "crisperwhisper":
-        result = _transcribe_crisperwhisper(audio, model_size, device,
-                                           language, cw_mode)
-    elif engine == "openai-whisper":
+    if engine == "openai-whisper":
         result = _transcribe_openai(audio, model_size, device, language)
     else:
         result = _transcribe_faster(audio, model_size, device, language)
@@ -343,207 +338,6 @@ def _unload_ct2_vram():
         pass
 
 
-CW_MODELS = {"large", "turbo", "medium", "small"}
-CW_MODEL_FALLBACK = {"large-v3": "large", "base": "small", "tiny": "small"}
-
-
-def cw_normalize_model(model_size):
-    """CrisperWhisper 모델 크기 정규화 (Whisper 크기 이름 → 가장 가까운 CW 크기)."""
-    if model_size in CW_MODELS:
-        return model_size
-    return CW_MODEL_FALLBACK.get(model_size, "large")
-
-
-def cw_words_to_segments(words, full_text):
-    """CrisperWhisper 평면 단어 목록 → 파이프라인 세그먼트 1개.
-
-    무음 기준 분할은 postprocess가 단어 타임스탬프로 전담하므로
-    세그먼트 경계는 형식 맞춤용. 일부 None 시각은 후처리 보간에 위임.
-    """
-    items = [{"word": w.word, "start": w.start, "end": w.end} for w in words]
-    starts = [it["start"] for it in items if it["start"] is not None]
-    ends = [it["end"] for it in items if it["end"] is not None]
-    if not starts or not ends:
-        return []
-    return [{
-        "start": min(starts),
-        "end": max(ends),
-        "text": full_text.strip(),
-        "words": items,
-    }]
-
-
-def _release_torch_vram():
-    """CPU 재시도 전 GPU 모델 해제 — VRAM 회수 후 센티널로 교체 (종료 가드는 non-None만 확인)."""
-    global _whisper_model
-    try:
-        import torch
-        engine = getattr(_whisper_model, "_engine", None)
-        m = getattr(engine, "model", None)
-        if m is not None:
-            m.to("cpu")
-        if _whisper_model is not None:
-            _whisper_model = _RELEASED
-        gc.collect()
-        torch.cuda.empty_cache()
-    except Exception:
-        pass
-
-
-def _is_gpu_failure(exc):
-    """GPU 관련 실패(OOM/CUDA/cuBLAS/cuDNN)만 CPU 재시도 대상으로 판정."""
-    try:
-        import torch
-        if isinstance(exc, torch.cuda.OutOfMemoryError):
-            return True
-    except Exception:
-        pass
-    msg = f"{type(exc).__name__}: {exc}".lower()
-    return any(k in msg for k in ("cuda", "out of memory", "cublas", "cudnn", "device-side"))
-
-
-def _download_cw_model(repo_id):
-    """모델 사전 다운로드 (최초 1회) — HF 캐시 크기 폴링으로 진행률 보고."""
-    import threading
-    from huggingface_hub import snapshot_download
-    try:
-        from huggingface_hub import constants as hf_constants
-        cache_root = hf_constants.HF_HUB_CACHE
-    except Exception:
-        cache_root = os.path.join(os.path.expanduser("~"),
-                                  ".cache", "huggingface", "hub")
-    repo_dir = os.path.join(cache_root, "models--" + repo_id.replace("/", "--"))
-
-    def dir_size(path):
-        blobs = os.path.join(path, "blobs")
-        target = blobs if os.path.isdir(blobs) else path
-        total = 0
-        for root, _dirs, files in os.walk(target):
-            for name in files:
-                fp = os.path.join(root, name)
-                try:
-                    if os.path.islink(fp):
-                        continue
-                    total += os.path.getsize(fp)
-                except OSError:
-                    pass
-        return total
-
-    stop = threading.Event()
-
-    def poll():
-        while not stop.wait(2.0):
-            gb = dir_size(repo_dir) / 1e9 if os.path.isdir(repo_dir) else 0.0
-            if stop.is_set():
-                break
-            report("transcribing", 22,
-                   f"[crisperwhisper] 모델 다운로드 중 (최초 1회)... {gb:.2f} GB")
-
-    t = threading.Thread(target=poll, daemon=True)
-    t.start()
-    try:
-        snapshot_download(
-            repo_id,
-            allow_patterns=["*.json", "*.bin", "*.safetensors", "*.txt", "*.model"],
-        )
-    finally:
-        stop.set()
-        t.join(timeout=5)
-
-
-def _transcribe_crisperwhisper(audio_path, model_size, device, language, mode):
-    """CrisperWhisper 2.0 (transformers 백엔드). GPU 실패 시 CPU 재시도."""
-    import torch
-
-    if device == "cpu":
-        actual_device = "cpu"
-    else:
-        actual_device = "cuda" if torch.cuda.is_available() else "cpu"
-        if device == "cuda" and actual_device == "cpu":
-            report("warning", 0, "CUDA를 사용할 수 없습니다. CPU로 전환합니다.")
-
-    # 언어/크기 정규화와 모델 다운로드는 재시도 범위 밖 (중복 실행 방지)
-    if language == "auto":
-        report("warning", 20,
-               "CrisperWhisper는 언어 자동 감지를 지원하지 않습니다 — 영어(en)로 진행합니다.")
-        language = "en"
-
-    cw_size = cw_normalize_model(model_size)
-    if cw_size != model_size:
-        report("warning", 20,
-               f"CrisperWhisper 모델 크기 조정: {model_size} → {cw_size}")
-
-    from crisperwhisper import OFFICIAL_MODELS
-    repo_id = OFFICIAL_MODELS[cw_size]
-
-    report("transcribing", 21, f"[crisperwhisper] 모델 확인 중 ({cw_size})...")
-    try:
-        _download_cw_model(repo_id)
-    except Exception as e:
-        # 캐시가 있으면 오프라인에서도 로드 가능 — 사전 다운로드 실패는 경고만
-        report("warning", 22,
-               f"모델 사전 다운로드 실패({type(e).__name__}) — 로드 단계에서 재시도")
-
-    try:
-        return _transcribe_crisperwhisper_impl(
-            audio_path, cw_size, actual_device, language, mode)
-    except Exception as e:
-        if actual_device != "cuda" or not _is_gpu_failure(e):
-            raise
-        err_name = type(e).__name__
-        # except 블록을 벗어나며 예외/트레이스백 참조가 해제되어 GPU 모델 회수 가능
-    _release_torch_vram()
-    report("warning", 20,
-           f"GPU 인식 실패({err_name}) — CPU로 재시도합니다 (느려질 수 있음)")
-    return _transcribe_crisperwhisper_impl(audio_path, cw_size, "cpu", language, mode)
-
-
-def _transcribe_crisperwhisper_impl(audio_path, cw_size, actual_device, language, mode):
-    global _whisper_model
-
-    device_label = "GPU (CUDA)" if actual_device == "cuda" else "CPU"
-    report("transcribing", 25,
-           f"[crisperwhisper] 모델 로딩 중 ({cw_size}, {device_label})...")
-
-    from crisperwhisper import CrisperWhisperModel
-
-    model = CrisperWhisperModel(
-        cw_size,
-        backend="transformers",
-        device=actual_device,
-        compute_type="float16" if actual_device == "cuda" else "float32",
-    )
-    _whisper_model = model
-
-    mode_label = "정제(intended)" if mode == "intended" else "축어(verbatim)"
-    report("transcribing", 35,
-           f"지정된 언어: {language} — 음성 인식 중... ({mode_label}, {device_label})")
-
-    result = model.transcribe(
-        audio_path,
-        language=language,
-        mode=mode,
-        sr=SAMPLE_RATE,
-        word_timestamps=True,
-        hallucination_mitigation=True,
-    )
-
-    segments = cw_words_to_segments(result.words or [], result.text or "")
-    detected_lang = result.language or language
-
-    if segments:
-        n_words = len(segments[0]["words"])
-        approx_spoken = len((result.text or "").split())
-        if approx_spoken and n_words < approx_spoken * 0.8:
-            report("warning", 84,
-                   f"타임스탬프 미배치 단어 {approx_spoken - n_words}개 — 일부 단어가 자막에서 빠질 수 있습니다")
-        report("transcribing", 85,
-               f"[crisperwhisper] 음성 인식 완료 ({n_words}개 단어, {device_label})")
-    # 무음/무발화: 빈 목록 반환 → main()의 "음성이 감지되지 않았습니다" 처리에 위임
-
-    return segments, detected_lang, actual_device
-
-
 def format_timestamp(seconds):
     """초를 SRT 타임스탬프 형식으로 변환 (HH:MM:SS,mmm)"""
     hours = int(seconds // 3600)
@@ -592,23 +386,19 @@ def main():
     parser = argparse.ArgumentParser(description="비디오 자막 생성기")
     parser.add_argument("video_path", help="비디오 파일 경로")
     parser.add_argument("--model", default="large-v3",
-                        choices=["tiny", "base", "small", "medium", "large-v3",
-                                 "large", "turbo"],
-                        help="모델 크기 (Whisper: tiny~large-v3 / CrisperWhisper: large, turbo, medium, small)")
+                        choices=["tiny", "base", "small", "medium", "large-v3"],
+                        help="Whisper 모델 크기 (tiny~large-v3)")
     parser.add_argument("--output", default="", help="출력 SRT 파일 경로")
     parser.add_argument("--ffmpeg", default="ffmpeg", help="ffmpeg 실행 파일 경로")
     parser.add_argument("--device", default="auto",
                         choices=["auto", "cuda", "cpu"],
                         help="처리 디바이스 (auto=GPU 우선, cuda=GPU 강제, cpu=CPU만)")
     parser.add_argument("--engine", default="faster-whisper",
-                        choices=["faster-whisper", "openai-whisper", "crisperwhisper"],
-                        help="음성 인식 엔진 (faster-whisper=CTranslate2, openai-whisper=PyTorch, crisperwhisper=CrisperWhisper 2.0)")
+                        choices=["faster-whisper", "openai-whisper"],
+                        help="음성 인식 엔진 (faster-whisper=CTranslate2, openai-whisper=PyTorch)")
     parser.add_argument("--language", default="auto",
                         choices=["auto", "ko", "en", "ja", "zh"],
                         help="음성 언어 (auto=자동 감지)")
-    parser.add_argument("--cw-mode", default="intended",
-                        choices=["intended", "verbatim"],
-                        help="CrisperWhisper 전사 모드 (intended=정제, verbatim=축어)")
     args = parser.parse_args()
 
     # 번들된 ffmpeg 경로를 전역으로 설정
@@ -653,8 +443,7 @@ def main():
 
         # 2. 음성 인식 (GPU/CPU 자동 선택)
         segments, detected_lang, used_device = transcribe_audio(
-            audio_path, args.model, args.device, args.engine, args.language,
-            args.cw_mode
+            audio_path, args.model, args.device, args.engine, args.language
         )
 
         if not segments:
