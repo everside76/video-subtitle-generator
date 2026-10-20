@@ -71,7 +71,10 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['whisperx', 'pytorch_lightning', 'lightning_fabric', 'torchvision',
+    # Audio is decoded by PyAV/ffmpeg and passed as numpy arrays. An optional
+    # torchcodec module collected transitively without metadata makes
+    # transformers AutoProcessor fail during import in the frozen runtime.
+    excludes=['whisperx', 'torchcodec', 'pytorch_lightning', 'lightning_fabric', 'torchvision',
               'matplotlib', 'pandas', 'sklearn', 'IPython', 'jedi'],
     noarchive=False,
     optimize=0,

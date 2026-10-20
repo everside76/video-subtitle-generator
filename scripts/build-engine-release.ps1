@@ -25,16 +25,17 @@ foreach ($f in 'ffmpeg.exe', 'ffprobe.exe') {
 }
 $tarExe = Join-Path $env:SystemRoot 'System32\tar.exe'
 if (-not (Test-Path $tarExe)) { throw 'tar.exe 없음 (Windows 10 17063+ / 64비트 PowerShell에서 실행하세요)' }
-$pyinstaller = Join-Path $py '.venv\Scripts\pyinstaller.exe'
-if (-not $SkipBuild -and -not (Test-Path $pyinstaller)) {
-  throw "pyinstaller.exe 없음: $pyinstaller — scripts\setup.bat으로 venv를 준비하세요"
+$pythonExe = Join-Path $py '.venv\Scripts\python.exe'
+if (-not $SkipBuild -and -not (Test-Path $pythonExe)) {
+  throw "python.exe 없음: $pythonExe — scripts\setup.bat으로 venv를 준비하세요"
 }
 
 if (-not $SkipBuild) {
   Write-Host '=== PyInstaller 빌드 ==='
   Push-Location $py
   try {
-    & $pyinstaller --noconfirm process_video.spec
+    # venv가 다른 폴더로 이동해도 오래된 절대경로가 내장된 launcher.exe에 의존하지 않는다.
+    & $pythonExe -m PyInstaller --noconfirm process_video.spec
     $code = $LASTEXITCODE
   } finally { Pop-Location }
   if ($code -ne 0) { throw "PyInstaller 실패 (exit $code)" }
@@ -117,4 +118,4 @@ $manifest | ConvertTo-Json -Depth 4 | Out-File -Encoding utf8 $manifestPath
 Write-Host ''
 Write-Host "완료: $outDir"
 Write-Host "업로드: GitHub Release 태그 engine-v$EngineVersion 에 engine-manifest.json + engine.zip.* 업로드"
-Write-Host '주의: 앱 릴리스(v1.8.0)보다 엔진 릴리스 업로드가 먼저여야 합니다.'
+Write-Host '주의: 이 엔진을 요구하는 앱 릴리스보다 엔진 릴리스 업로드가 먼저여야 합니다.'
