@@ -98,6 +98,8 @@ body {
   background: #16213e;
   border-bottom: 1px solid #0f3460;
   flex-shrink: 0;
+  max-height: 46vh;
+  overflow-y: auto;
 }
 
 #settings-panel.visible {
@@ -121,6 +123,20 @@ body {
   font-size: 12px;
   margin-left: 6px;
 }
+
+#terms-input {
+  min-width: 280px;
+  padding: 6px 8px;
+  margin-left: 6px;
+  background: #1a1a2e;
+  border: 1px solid #536681;
+  border-radius: 4px;
+  color: #e0e0e0;
+}
+.settings-help { width: 100%; font-size: 11px; color: #a0b4d0; line-height: 1.6; }
+#movie-preset { padding: 6px 10px; border: 1px solid #21cbf3; border-radius: 4px; background: #1a1a2e; color: #21cbf3; cursor: pointer; }
+.audio-track-select { width: 100%; margin-top: 6px; background: #16213e; color: #e0e0e0; border: 1px solid #536681; border-radius: 3px; font-size: 11px; padding: 4px; }
+.audio-track-note { margin-top: 5px; font-size: 11px; color: #a0b4d0; white-space: normal; }
 
 /* Main Layout */
 #main-layout {
@@ -596,13 +612,13 @@ body {
   background: #1976d2;
 }
 
-#new-video-btn {
+#new-video-btn, #original-toggle {
   background: transparent;
   border: 1px solid #0f3460;
   color: #a0b4d0;
 }
 
-#new-video-btn:hover {
+#new-video-btn:hover, #original-toggle:hover {
   background: #0f3460;
   color: #e0e0e0;
 }

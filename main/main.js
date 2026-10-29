@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const subtitleOps = require('./subtitle-operations');
 const engineManager = require('./engine-manager');
+const { getAudioTracks } = require('./media-info');
 const { createAppUpdater } = require('./app-updater');
 
 let mainWindow;
@@ -111,6 +112,8 @@ ipcMain.handle('open-video-files', async () => {
 });
 
 // IPC: 비디오 처리 시작
+ipcMain.handle('audio-tracks', (_event, videoPath) => getAudioTracks(videoPath));
+
 ipcMain.handle('process-video', async (event, { videoPath, options }) => {
   if (appUpdater?.getStatus().state === 'installing') throw new Error('업데이트를 적용하고 있습니다.');
   activeJobs++;

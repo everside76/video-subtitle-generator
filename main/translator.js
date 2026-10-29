@@ -17,11 +17,13 @@ function getFetch() {
   return fetch;
 }
 
-async function translateOne(text, targetLang) {
-  const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl='
+async function translateOne(text, targetLang, sourceLang) {
+  const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl='
+    + encodeURIComponent(sourceLang) + '&tl='
     + encodeURIComponent(targetLang) + '&dt=t&q=' + encodeURIComponent(text);
   const res = await getFetch()(url, {
     headers: { 'User-Agent': 'Mozilla/5.0' },
+    signal: AbortSignal.timeout(20000),
   });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const data = await res.json();
@@ -30,12 +32,12 @@ async function translateOne(text, targetLang) {
   return out.trim();
 }
 
-async function translateWithRetry(text, targetLang) {
+async function translateWithRetry(text, targetLang, sourceLang) {
   try {
-    return await translateOne(text, targetLang);
+    return await translateOne(text, targetLang, sourceLang);
   } catch {
     await new Promise((r) => setTimeout(r, 500));
-    return translateOne(text, targetLang);
+    return translateOne(text, targetLang, sourceLang);
   }
 }
 
@@ -78,10 +80,28 @@ function buildSrt(blocks) {
  * mode: 'ko' = 한국어만, 'both' = 원문 + 한국어
  * onProgress(done, total)
  */
-async function translateSrtFile(srtPath, mode, onProgress) {
+function preserveOriginal(srtPath, content) {
+  const stem = srtPath.replace(/\.srt$/i, '');
+  for (let number = 1; ; number++) {
+    const candidate = `${stem}.original${number === 1 ? '' : '.' + number}.srt`;
+    try {
+      fs.writeFileSync(candidate, content, { encoding: 'utf8', flag: 'wx' });
+      return candidate;
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      if (fs.readFileSync(candidate, 'utf8') === content) return candidate;
+    }
+  }
+}
+
+async function translateSrtFile(srtPath, mode, onProgress, sourceLang = 'auto') {
+  if (!['ko', 'both'].includes(mode)) throw new Error('지원하지 않는 번역 모드입니다.');
+  sourceLang = /^[a-z]{2,3}$/.test(sourceLang) && sourceLang !== 'und' ? sourceLang : 'auto';
   const content = fs.readFileSync(srtPath, 'utf-8');
   const blocks = parseSrt(content);
   if (blocks.length === 0) return { translated: 0, failed: 0 };
+  // Complete the backup before sending text or replacing any subtitle content.
+  const originalPath = preserveOriginal(srtPath, content);
 
   let done = 0;
   let failed = 0;
@@ -89,9 +109,11 @@ async function translateSrtFile(srtPath, mode, onProgress) {
   for (let i = 0; i < blocks.length; i += CONCURRENCY) {
     const chunk = blocks.slice(i, i + CONCURRENCY);
     await Promise.all(chunk.map(async (block) => {
-      const flat = block.text.replace(/\s*\n\s*/g, ' ');
+      // Japanese/Chinese lines can wrap in the middle of a word. Inserting a
+      // Latin space here corrupts names and grammatical phrases before translation.
+      const flat = block.text.replace(/\s*\n\s*/g, ['ja', 'zh'].includes(sourceLang) ? '' : ' ');
       try {
-        const translated = await translateWithRetry(flat, 'ko');
+        const translated = await translateWithRetry(flat, 'ko', sourceLang);
         block.text = mode === 'both'
           ? block.text + '\n' + translated
           : wrapKo(translated);
@@ -104,7 +126,7 @@ async function translateSrtFile(srtPath, mode, onProgress) {
   }
 
   fs.writeFileSync(srtPath, buildSrt(blocks), 'utf-8');
-  return { translated: done - failed, failed };
+  return { translated: done - failed, failed, originalPath };
 }
 
 module.exports = { translateSrtFile, parseSrt, wrapKo };

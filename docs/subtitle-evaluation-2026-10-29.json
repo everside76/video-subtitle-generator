@@ -1,0 +1,623 @@
+{
+  "date": "2026-10-29",
+  "app": "1.10.0",
+  "runtime": "engine-v4",
+  "hardware": "NVIDIA RTX 5060 Laptop GPU",
+  "comparisons": [
+    {
+      "name": "Japanese dialogue",
+      "before": {
+        "cer": 0.2413793103448276,
+        "silence_overlap_seconds": 0,
+        "samples": [
+          {
+            "id": "japanese",
+            "exit_code": 0,
+            "successful": true,
+            "reference_characters": 174,
+            "character_errors": 42,
+            "cer": 0.2413793103448276,
+            "silence_overlap_seconds": 0,
+            "cue_count": 10
+          }
+        ]
+      },
+      "after": {
+        "cer": 0.2413793103448276,
+        "silence_overlap_seconds": 0,
+        "samples": [
+          {
+            "id": "japanese",
+            "exit_code": 0,
+            "successful": true,
+            "reference_characters": 174,
+            "character_errors": 42,
+            "cer": 0.2413793103448276,
+            "silence_overlap_seconds": 0,
+            "cue_count": 10
+          }
+        ]
+      }
+    },
+    {
+      "name": "Japanese dialogue with effects",
+      "before": {
+        "cer": 0.3735632183908046,
+        "silence_overlap_seconds": 1.428,
+        "samples": [
+          {
+            "id": "mixed",
+            "exit_code": 0,
+            "successful": true,
+            "reference_characters": 174,
+            "character_errors": 65,
+            "cer": 0.3735632183908046,
+            "silence_overlap_seconds": 1.428,
+            "cue_count": 10
+          }
+        ]
+      },
+      "after": {
+        "cer": 0.3793103448275862,
+        "silence_overlap_seconds": 0,
+        "samples": [
+          {
+            "id": "mixed",
+            "exit_code": 0,
+            "successful": true,
+            "reference_characters": 174,
+            "character_errors": 66,
+            "cer": 0.3793103448275862,
+            "silence_overlap_seconds": 0,
+            "cue_count": 7
+          }
+        ]
+      }
+    },
+    {
+      "name": "Synthetic English with silence/background",
+      "before": {
+        "cer": 0.051351351351351354,
+        "silence_overlap_seconds": 0,
+        "samples": [
+          {
+            "id": "clean",
+            "exit_code": 0,
+            "successful": true,
+            "reference_characters": 370,
+            "character_errors": 20,
+            "cer": 0.05405405405405406,
+            "silence_overlap_seconds": 0,
+            "cue_count": 14
+          },
+          {
+            "id": "background",
+            "exit_code": 0,
+            "successful": true,
+            "reference_characters": 370,
+            "character_errors": 18,
+            "cer": 0.04864864864864865,
+            "silence_overlap_seconds": 0,
+            "cue_count": 15
+          },
+          {
+            "id": "silence",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "tone",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          }
+        ]
+      },
+      "after": {
+        "cer": 0.07567567567567568,
+        "silence_overlap_seconds": 0,
+        "samples": [
+          {
+            "id": "clean",
+            "exit_code": 0,
+            "successful": true,
+            "reference_characters": 370,
+            "character_errors": 28,
+            "cer": 0.07567567567567568,
+            "silence_overlap_seconds": 0,
+            "cue_count": 13
+          },
+          {
+            "id": "background",
+            "exit_code": 0,
+            "successful": true,
+            "reference_characters": 370,
+            "character_errors": 28,
+            "cer": 0.07567567567567568,
+            "silence_overlap_seconds": 0,
+            "cue_count": 13
+          },
+          {
+            "id": "silence",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "tone",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "Non-speech reproduction",
+      "before": {
+        "cer": null,
+        "silence_overlap_seconds": 0.9359999999999999,
+        "samples": [
+          {
+            "id": "fx-breathing-0",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-breathing-1",
+            "exit_code": 0,
+            "successful": false,
+            "reference_characters": 0,
+            "character_errors": 2,
+            "cer": null,
+            "silence_overlap_seconds": 0.292,
+            "cue_count": 1
+          },
+          {
+            "id": "fx-laughing-0",
+            "exit_code": 0,
+            "successful": false,
+            "reference_characters": 0,
+            "character_errors": 3,
+            "cer": null,
+            "silence_overlap_seconds": 0.644,
+            "cue_count": 1
+          },
+          {
+            "id": "fx-laughing-1",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-coughing-0",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-coughing-1",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-sneezing-0",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-sneezing-1",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-door_wood_knock-0",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-door_wood_knock-1",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-fireworks-0",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-fireworks-1",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          }
+        ]
+      },
+      "after": {
+        "cer": null,
+        "silence_overlap_seconds": 0,
+        "samples": [
+          {
+            "id": "fx-breathing-0",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-breathing-1",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-laughing-0",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-laughing-1",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-coughing-0",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-coughing-1",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-sneezing-0",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-sneezing-1",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-door_wood_knock-0",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-door_wood_knock-1",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-fireworks-0",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "fx-fireworks-1",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "Non-speech holdout",
+      "after": {
+        "cer": null,
+        "silence_overlap_seconds": 0,
+        "samples": [
+          {
+            "id": "holdout-breathing-0",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "holdout-laughing-0",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "holdout-coughing-0",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "holdout-sneezing-0",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "holdout-door_wood_knock-0",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          },
+          {
+            "id": "holdout-fireworks-0",
+            "exit_code": 1,
+            "successful": true,
+            "reference_characters": 0,
+            "character_errors": 0,
+            "cer": null,
+            "silence_overlap_seconds": 0,
+            "cue_count": 0
+          }
+        ]
+      }
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://huggingface.co/datasets/japanese-asr/ja_asr.reazonspeech_test",
+      "selection": "First eight rows of test split; selected before decoding"
+    },
+    {
+      "url": "https://github.com/karolpiczak/ESC-50",
+      "selection": "First two examples in metadata for breathing, laughing, coughing, sneezing, door_wood_knock, fireworks; third example in each category held out"
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "japanese",
+      "sha256": "33737b0bf2292f9e45972dbb280e23a9d49384a948a7f7e1bd3a9cd9e92ab499"
+    },
+    {
+      "id": "mixed",
+      "sha256": "14232ce34a33de514cea09c4bcd7b874eb81aef617ec84fa315354ee83260008"
+    },
+    {
+      "id": "clean",
+      "sha256": "0ae34d502d5e89d6c88d18bb164af23d4f1bf0c0e31fd83024ae6652efa4b82c"
+    },
+    {
+      "id": "background",
+      "sha256": "c12c31f3d6cce4b32137100c2abab3f433ed24f3175e86abef5e668977487b48"
+    },
+    {
+      "id": "silence",
+      "sha256": "47b589098cc9e4b92774cd5b6a57ccca0713c02396bf755b2318f7e81cdc534e"
+    },
+    {
+      "id": "tone",
+      "sha256": "f60df4421a412fcda23d7de7a6583d9612897e0ccd82da15bb70380ddac4cff6"
+    },
+    {
+      "id": "fx-breathing-0",
+      "sha256": "cdbd39617f2955d86ec18a4032ecd9090369c23f3d8c6d650f62e9e1ee19ea6a",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-18631-A-23.wav"
+    },
+    {
+      "id": "fx-breathing-1",
+      "sha256": "8b546dc3be7448c10a7fe8c5b0b48b556e860827e28d559c3a8ec19961e3cce3",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-30709-A-23.wav"
+    },
+    {
+      "id": "fx-laughing-0",
+      "sha256": "dc6cd665f3d20eed6089d9593a2b776104d8671c57ce6c48e6be030c75a53643",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-1791-A-26.wav"
+    },
+    {
+      "id": "fx-laughing-1",
+      "sha256": "dcb1b2c6686b090bf63775eb79a64d96c243987e6ae66cbb96a4a66610b37809",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-30039-A-26.wav"
+    },
+    {
+      "id": "fx-coughing-0",
+      "sha256": "ab2afe6d0ee0de5edc1f0107448077919c6ac94dcf59243497e6fcb333685438",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-19111-A-24.wav"
+    },
+    {
+      "id": "fx-coughing-1",
+      "sha256": "4fb6197f72791e50c465de8f1f715a7a3f93f7afab62dfa130f28d500303d8d9",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-19118-A-24.wav"
+    },
+    {
+      "id": "fx-sneezing-0",
+      "sha256": "8e32762c8c48e5414dbecc2979833748cb838ba476bac75d2a512262ef842eb0",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-26143-A-21.wav"
+    },
+    {
+      "id": "fx-sneezing-1",
+      "sha256": "4c1cdb30db5fd43eb62c17c051efaf7dde38938c0449e6bfcfb998dba92cc443",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-29680-A-21.wav"
+    },
+    {
+      "id": "fx-door_wood_knock-0",
+      "sha256": "e738266e395e378102f74e0920b05ff5937543788420d5b2a6b8d3df8bdb3910",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-101336-A-30.wav"
+    },
+    {
+      "id": "fx-door_wood_knock-1",
+      "sha256": "1c1d3e65b7a58658766180d2faeeb9bdd1fe7405119bf100d9cd2f671a6e2b11",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-103995-A-30.wav"
+    },
+    {
+      "id": "fx-fireworks-0",
+      "sha256": "3ac50abf1e7c9b3086585d7d786c2f6b7b4b884108ceb4c4f643f8e3fa4caaab",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-115545-A-48.wav"
+    },
+    {
+      "id": "fx-fireworks-1",
+      "sha256": "5f0f6888b96325412665b9265ffecfc6337f07d9e71bf98205304f9e28fd34a2",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-115545-B-48.wav"
+    },
+    {
+      "id": "holdout-breathing-0",
+      "sha256": "b13bf95518ece537cd5f4dd564ded31ee66cdeae30af4cfebb88a8e5dedf6dfc",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-30709-B-23.wav"
+    },
+    {
+      "id": "holdout-laughing-0",
+      "sha256": "1f7b0a945875fa57a2c213e8e09afb4898675f87aafd59b2bdbfcaae9f750723",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-30043-A-26.wav"
+    },
+    {
+      "id": "holdout-coughing-0",
+      "sha256": "e0374e3191067ad9a63df3ae9157e0ca44a36f4f1fa7586982609565683f6a13",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-30830-A-24.wav"
+    },
+    {
+      "id": "holdout-sneezing-0",
+      "sha256": "865652b27db628cd353379f222c01a48711f383d16b3d80bcd8493e6e8432a9e",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-31748-A-21.wav"
+    },
+    {
+      "id": "holdout-door_wood_knock-0",
+      "sha256": "f33db9ec0b036d0dd17c911d456c33a59c0fc85974245a85fed56b8d2568724e",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-103999-A-30.wav"
+    },
+    {
+      "id": "holdout-fireworks-0",
+      "sha256": "8f377a0ec82ef2e7c0e7b59714180edc0a4bc039b8f362d2eeead8b1e6c5bd58",
+      "url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-115545-C-48.wav"
+    }
+  ]
+}

@@ -18,6 +18,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from subtitle_postprocess import postprocess
 from speech_filter import prepare_speech, restore_speech_segments
+from audio_tracks import probe_audio_streams, select_audio_stream, has_center_channel, extraction_args
+from speech_verification import verify_short_regions
 
 
 def _load_cuda_libs():
@@ -114,7 +116,7 @@ FFMPEG_PATH = "ffmpeg"
 FFPROBE_PATH = "ffprobe"
 
 
-def detect_device(requested_device):
+def detect_device(requested_device, precision="accurate"):
     """
     사용 가능한 디바이스 감지.
     requested_device: "auto", "cuda", "cpu"
@@ -126,11 +128,13 @@ def detect_device(requested_device):
     # CUDA 사용 가능 여부 확인
     try:
         import ctranslate2
-        ctranslate2.get_supported_compute_types("cuda")
+        supported = ctranslate2.get_supported_compute_types("cuda")
         # CUDA 테스트 - 실제로 GPU에 접근 가능한지 확인
         if requested_device in ("cuda", "auto"):
-            # 8GB VRAM에서 large-v3 안전 로드 (품질 손실 미미)
-            return "cuda", "int8_float16"
+            preferred = ["float16", "int8_float16"] if precision == "accurate" else ["int8_float16", "float16"]
+            for compute_type in preferred:
+                if compute_type in supported:
+                    return "cuda", compute_type
     except Exception:
         if requested_device == "cuda":
             report("warning", 0, "CUDA를 사용할 수 없습니다. CPU로 전환합니다.")
@@ -138,17 +142,14 @@ def detect_device(requested_device):
     return "cpu", "int8"
 
 
-def extract_audio(video_path, audio_path):
+def extract_audio(video_path, audio_path, audio_stream="auto", audio_mix="full"):
     """ffmpeg로 비디오에서 오디오 추출 (16kHz mono WAV)"""
     report("extracting", 5, "오디오 추출 중...")
-    cmd = [
-        FFMPEG_PATH, "-y",
-        "-i", video_path,
-        "-ar", "16000",
-        "-ac", "1",
-        "-f", "wav",
-        audio_path
-    ]
+    stream = select_audio_stream(probe_audio_streams(video_path, FFPROBE_PATH), audio_stream)
+    if audio_mix == "center" and not has_center_channel(stream):
+        report("warning", 5, "중앙 채널이 없는 음성 트랙입니다. 전체 음성으로 처리합니다.")
+    report("extracting", 6, f"음성 트랙 {stream['index']} 추출 중...")
+    cmd = [FFMPEG_PATH] + extraction_args(video_path, audio_path, stream, audio_mix)
     result = subprocess.run(
         cmd,
         stdout=subprocess.PIPE,
@@ -158,13 +159,25 @@ def extract_audio(video_path, audio_path):
     if result.returncode != 0:
         raise RuntimeError(f"ffmpeg 오류: {result.stderr.decode('utf-8', errors='replace')}")
     report("extracting", 15, "오디오 추출 완료")
+    return {"index": stream["index"], "language": stream.get("tags", {}).get("language", "und"),
+            "mix": "center" if audio_mix == "center" and has_center_channel(stream) else "full"}
+
+
+def normalize_terms(terms):
+    """Bound user vocabulary so it cannot exhaust the decoder's text context."""
+    return " ".join("".join(c if c.isprintable() else " " for c in terms).split())[:300].strip()
 
 
 def transcribe_audio(audio_path, model_size="large-v3", device="auto",
-                     engine="faster-whisper", language="auto"):
+                     engine="faster-whisper", language="auto", terms="", precision="accurate", speech_guard="strict"):
     """모든 엔진에서 실제 발화만 인식하고 원본 영상의 시간으로 복원."""
     if engine not in ("faster-whisper", "openai-whisper"):
         raise ValueError(f"지원하지 않는 음성 인식 엔진: {engine}")
+    if precision not in ("accurate", "balanced"):
+        raise ValueError("지원하지 않는 인식 품질 설정입니다.")
+    if speech_guard not in ("strict", "balanced"):
+        raise ValueError("지원하지 않는 무음 억제 설정입니다.")
+    terms = normalize_terms(terms)
     report("transcribing", 17, "발화 구간 확인 중... (무음 제외)")
     audio, speech_chunks = prepare_speech(audio_path)
     if not speech_chunks:
@@ -172,33 +185,64 @@ def transcribe_audio(audio_path, model_size="large-v3", device="auto",
     report("transcribing", 19,
            f"발화 {len(speech_chunks)}개 구간 확인 — 무음을 제외하고 인식합니다")
     if engine == "openai-whisper":
-        result = _transcribe_openai(audio, model_size, device, language)
+        result = _transcribe_openai(audio, model_size, device, language, terms)
     else:
-        result = _transcribe_faster(audio, model_size, device, language)
+        result = _transcribe_faster(audio, model_size, device, language, terms, precision)
     segments, detected_lang, used_device = result
-    segments = restore_speech_segments(segments, speech_chunks)
+    if speech_guard == 'strict' and _whisper_model is not None:
+        def decode_short(sample):
+            settings = dict(language=detected_lang, temperature=0.0, beam_size=5,
+                            word_timestamps=True, condition_on_previous_text=False,
+                            no_speech_threshold=.6, hallucination_silence_threshold=1.0)
+            if engine == 'faster-whisper':
+                decoded, _ = _whisper_model.transcribe(sample, vad_filter=False, hotwords=None, **settings)
+                return [{'avg_logprob': s.avg_logprob, 'no_speech_prob': s.no_speech_prob,
+                         'compression_ratio': s.compression_ratio,
+                         'words': [{'word': w.word, 'start': w.start, 'end': w.end,
+                                    'probability': w.probability} for w in s.words or []]} for s in decoded]
+            return _whisper_model.transcribe(sample, initial_prompt=None, carry_initial_prompt=False,
+                fp16=used_device == 'cuda', verbose=None, **settings).get('segments', [])
+        segments, excluded = verify_short_regions(audio, segments, speech_chunks, decode_short,
+            lambda done, total: report('transcribing', 86,
+                f'불확실한 발화 확인 중... ({done}/{total}, 무음·효과음 오인 억제)'))
+        if excluded:
+            report('warning', 87, f'대사로 확신하기 어려운 구간 {excluded}개를 제외했습니다.')
+    segments = restore_speech_segments(segments, speech_chunks, strict=speech_guard == 'strict')
     return segments, detected_lang, used_device
 
 
-def _transcribe_faster(audio_path, model_size="base", device="auto", language="auto"):
+def _gpu_failure(error):
+    message = str(error).lower()
+    return any(marker in message for marker in
+               ("out of memory", "cuda", "cublas", "cudnn", "gpu driver"))
+
+
+def _transcribe_faster(audio_path, model_size="base", device="auto", language="auto",
+                       terms="", precision="accurate"):
     """faster-whisper 인식. GPU 실패(OOM 등) 시 CPU로 자동 재시도."""
-    actual_device, compute_type = detect_device(device)
-    try:
-        return _transcribe_faster_impl(
-            audio_path, model_size, actual_device, compute_type, language)
-    except Exception as e:
-        if actual_device != "cuda":
-            raise
+    actual_device, compute_type = detect_device(device, precision)
+    attempts = [(actual_device, compute_type)]
+    if actual_device == "cuda":
+        if compute_type == "float16":
+            attempts.append(("cuda", "int8_float16"))
+        attempts.append(("cpu", "int8"))
+    for index, (target, computation) in enumerate(attempts):
+        try:
+            return _transcribe_faster_impl(audio_path, model_size, target, computation, language, terms)
+        except Exception as error:
+            if target != "cuda" or not _gpu_failure(error) or index == len(attempts) - 1:
+                raise
+        # Leave the exception scope before releasing GPU resources.
         _unload_ct2_vram()
-        report("warning", 20,
-               f"GPU 인식 실패({type(e).__name__}) — CPU로 재시도합니다 (느려질 수 있음)")
-        return _transcribe_faster_impl(audio_path, model_size, "cpu", "int8", language)
+        next_device, _ = attempts[index + 1]
+        label = "GPU 메모리 절약 연산" if next_device == "cuda" else "CPU (느려질 수 있음)"
+        report("warning", 20, f"GPU 자원 부족 또는 오류 — {label}으로 재시도합니다.")
 
 
-def _transcribe_faster_impl(audio_path, model_size, actual_device, compute_type, language):
+def _transcribe_faster_impl(audio_path, model_size, actual_device, compute_type, language, terms=""):
     global _whisper_model
 
-    device_label = "GPU (CUDA)" if actual_device == "cuda" else "CPU"
+    device_label = f"GPU ({compute_type})" if actual_device == "cuda" else "CPU"
     report("transcribing", 20,
            f"[faster-whisper] 모델 로딩 중 ({model_size}, {device_label})...")
 
@@ -227,6 +271,9 @@ def _transcribe_faster_impl(audio_path, model_size, actual_device, compute_type,
         log_prob_threshold=-1.0,
         no_speech_threshold=0.6,
         hallucination_silence_threshold=1.0,
+        hotwords=terms or None,
+        language_detection_segments=3,
+        language_detection_threshold=0.8,
     )
 
     detected_lang = info.language
@@ -260,7 +307,7 @@ def _transcribe_faster_impl(audio_path, model_size, actual_device, compute_type,
     return segments, detected_lang, actual_device
 
 
-def _transcribe_openai(audio_path, model_size="base", device="auto", language="auto"):
+def _transcribe_openai(audio_path, model_size="base", device="auto", language="auto", terms=""):
     """OpenAI Whisper (PyTorch) 엔진으로 음성 인식"""
     global _whisper_model
 
@@ -296,6 +343,8 @@ def _transcribe_openai(audio_path, model_size="base", device="auto", language="a
         logprob_threshold=-1.0,
         no_speech_threshold=0.6,
         hallucination_silence_threshold=1.0,
+        initial_prompt=terms or None,
+        carry_initial_prompt=bool(terms),
         fp16=actual_device == "cuda",
     )
 
@@ -340,10 +389,10 @@ def _unload_ct2_vram():
 
 def format_timestamp(seconds):
     """초를 SRT 타임스탬프 형식으로 변환 (HH:MM:SS,mmm)"""
-    hours = int(seconds // 3600)
-    minutes = int((seconds % 3600) // 60)
-    secs = int(seconds % 60)
-    millis = int((seconds % 1) * 1000)
+    total_ms = max(0, round(seconds * 1000))
+    hours, remainder = divmod(total_ms, 3600000)
+    minutes, remainder = divmod(remainder, 60000)
+    secs, millis = divmod(remainder, 1000)
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
 
@@ -397,8 +446,12 @@ def main():
                         choices=["faster-whisper", "openai-whisper"],
                         help="음성 인식 엔진 (faster-whisper=CTranslate2, openai-whisper=PyTorch)")
     parser.add_argument("--language", default="auto",
-                        choices=["auto", "ko", "en", "ja", "zh"],
                         help="음성 언어 (auto=자동 감지)")
+    parser.add_argument("--terms", default="", help="인명·지명·전문용어 (최대 300자)")
+    parser.add_argument("--precision", choices=["accurate", "balanced"], default="accurate")
+    parser.add_argument("--audio-stream", default="auto", help="음성 트랙의 스트림 번호")
+    parser.add_argument("--audio-mix", choices=["full", "center"], default="full")
+    parser.add_argument("--speech-guard", choices=["strict", "balanced"], default="strict")
     args = parser.parse_args()
 
     # 번들된 ffmpeg 경로를 전역으로 설정
@@ -432,18 +485,19 @@ def main():
         duration_str = f"{h:02d}:{m:02d}:{s:02d}"
 
     # 임시 오디오 파일
-    temp_dir = tempfile.gettempdir()
-    audio_path = os.path.join(temp_dir, "subtitle_gen_temp.wav")
+    temp_dir = tempfile.mkdtemp(prefix="subtitle-gen-")
+    audio_path = os.path.join(temp_dir, "audio.wav")
 
     exit_code = 0
 
     try:
         # 1. 오디오 추출
-        extract_audio(video_path, audio_path)
+        audio_track = extract_audio(video_path, audio_path, args.audio_stream, args.audio_mix)
 
         # 2. 음성 인식 (GPU/CPU 자동 선택)
         segments, detected_lang, used_device = transcribe_audio(
-            audio_path, args.model, args.device, args.engine, args.language
+            audio_path, args.model, args.device, args.engine, args.language, args.terms, args.precision,
+            args.speech_guard
         )
 
         if not segments:
@@ -468,7 +522,8 @@ def main():
             "language": detected_lang,
             "segments": len(subtitles),
             "duration": duration_str,
-            "device": device_label
+            "device": device_label,
+            "audio_track": audio_track,
         })
 
     except SystemExit as e:
@@ -489,6 +544,10 @@ def main():
                 os.remove(audio_path)
             except OSError:
                 pass
+        try:
+            os.rmdir(temp_dir)
+        except OSError:
+            pass
 
         # CUDA 모델이 있으면 Python 정상 종료 과정에서 CUDA 소멸자 크래시 발생
         # os._exit로 Python cleanup을 건너뛰되 의도한 종료 코드는 보존

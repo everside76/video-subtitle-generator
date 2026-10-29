@@ -40,7 +40,8 @@ let currentProcessingId = null;
 let appUpdateStatus = { state: 'idle' };
 
 // ===== 설정 영속화 =====
-const SETTING_IDS = ['engine-select', 'device-select', 'language-select', 'translate-select'];
+const SETTING_IDS = ['engine-select', 'device-select', 'language-select', 'translate-select',
+  'precision-select', 'audio-mix-select', 'speech-guard-select'];
 
 // 모델 목록은 엔진마다 다르므로 별도 관리 (설정도 엔진별로 저장)
 const ENGINE_MODELS = {
@@ -67,6 +68,7 @@ const ENGINE_DEFAULT_MODEL = {
 // 엔진에 맞춰 모델 목록 동기화
 function syncEngineUI() {
   const engine = document.getElementById('engine-select').value;
+  document.getElementById('precision-label').hidden = engine !== 'faster-whisper';
   const modelSel = document.getElementById('model-select');
   const models = ENGINE_MODELS[engine] || ENGINE_MODELS['faster-whisper'];
 
@@ -124,6 +126,10 @@ function loadSettings() {
   migrateModelSetting();
   syncEngineUI();
 
+  const termsInput = document.getElementById('terms-input');
+  termsInput.value = (localStorage.getItem('setting:terms') || '').slice(0, 300);
+  termsInput.addEventListener('input', () => localStorage.setItem('setting:terms', termsInput.value));
+
   // 모델은 엔진별로 저장
   document.getElementById('model-select').addEventListener('change', () => {
     const engine = document.getElementById('engine-select').value;
@@ -132,6 +138,20 @@ function loadSettings() {
   });
 }
 loadSettings();
+
+document.getElementById('movie-preset').addEventListener('click', () => {
+  for (const [id, value] of Object.entries({
+    'engine-select': 'faster-whisper', 'device-select': 'auto',
+    'language-select': 'ja', 'translate-select': 'ko',
+    'precision-select': 'accurate', 'audio-mix-select': 'full',
+    'speech-guard-select': 'strict',
+  })) {
+    document.getElementById(id).value = value;
+    localStorage.setItem('setting:' + id, value);
+  }
+  localStorage.setItem('setting:model-select@faster-whisper', 'large-v3');
+  syncEngineUI();
+});
 
 // ===== 설정 토글 =====
 settingsToggle.addEventListener('click', () => {
@@ -191,10 +211,24 @@ function addToQueue(filePath) {
     result: null,
     error: null,
     srtContent: null,
+    audioStream: 'auto',
+    audioTracks: [],
+    audioProbeError: null,
+    probingAudio: true,
   };
   queue.push(item);
   renderQueue();
   updateButtons();
+  ipcRenderer.invoke('audio-tracks', filePath).then(tracks => {
+    item.audioTracks = tracks;
+    if (!tracks.length) item.audioProbeError = '음성 트랙 없음';
+  }).catch(() => {
+    item.audioProbeError = '트랙 확인 실패 — 처리할 때 다시 확인합니다.';
+  }).finally(() => {
+    item.probingAudio = false;
+    renderQueue();
+    updateButtons();
+  });
 }
 
 function removeFromQueue(id) {
@@ -245,11 +279,36 @@ function renderQueue() {
     el.innerHTML = `
       <div class="qi-status">${statusIcons[item.status]}</div>
       <div class="qi-info">
-        <div class="qi-name" title="${item.fileName}">${item.fileName}</div>
-        <div class="qi-detail">${getItemDetail(item)}</div>
+        <div class="qi-name"></div>
+        <div class="qi-detail"></div>
       </div>
       <button class="qi-remove" data-id="${item.id}" title="제거">\u00d7</button>
     `;
+
+    // Metadata and filenames are media content, not HTML.
+    el.querySelector('.qi-name').textContent = item.fileName;
+    el.querySelector('.qi-name').title = item.fileName;
+    el.querySelector('.qi-detail').textContent = getItemDetail(item);
+    const info = el.querySelector('.qi-info');
+    if (item.audioTracks.length > 1) {
+      const select = document.createElement('select');
+      select.className = 'audio-track-select';
+      select.setAttribute('aria-label', `${item.fileName} 음성 트랙`);
+      select.add(new Option('기본 음성 트랙', 'auto'));
+      for (const track of item.audioTracks) {
+        select.add(new Option(`${track.index}: ${track.language} · ${track.channels}채널${track.title ? ' · ' + track.title : ''}`, String(track.index)));
+      }
+      select.value = String(item.audioStream);
+      select.disabled = item.status !== 'pending' || isRunning;
+      select.addEventListener('click', e => e.stopPropagation());
+      select.addEventListener('change', () => { item.audioStream = select.value; });
+      info.appendChild(select);
+    } else if (item.probingAudio || item.audioProbeError) {
+      const note = document.createElement('div');
+      note.className = 'audio-track-note';
+      note.textContent = item.probingAudio ? '음성 트랙 확인 중…' : item.audioProbeError;
+      info.appendChild(note);
+    }
 
     // 클릭 → 결과 보기
     el.addEventListener('click', (e) => {
@@ -312,15 +371,24 @@ function showItemResult(item) {
   document.getElementById('res-segments').textContent = item.result.segments + '개';
   document.getElementById('res-duration').textContent = item.result.duration || '-';
   document.getElementById('res-device').textContent = item.result.device || 'CPU';
+  const track = item.result.audio_track;
+  document.getElementById('res-audio-track').textContent = track
+    ? `트랙 ${track.index} · ${track.mix === 'center' ? '중앙 채널' : '전체 음성'}` : '-';
+  const originalToggle = document.getElementById('original-toggle');
+  originalToggle.hidden = !item.result.original_srt_path;
+  originalToggle.textContent = item.showOriginal ? '번역 보기' : '원문 보기';
 
-  srtPreview.textContent = item.srtContent || '';
+  if (item.showOriginal) {
+    try { srtPreview.textContent = fs.readFileSync(item.result.original_srt_path, 'utf8'); }
+    catch { item.showOriginal = false; originalToggle.textContent = '원문 보기'; srtPreview.textContent = item.srtContent || ''; }
+  } else { srtPreview.textContent = item.srtContent || ''; }
   showView('result');
 }
 
 // ===== 버튼 상태 =====
 function updateButtons() {
   const hasPending = queue.some(i => i.status === 'pending');
-  queueStartBtn.disabled = !hasPending || isRunning;
+  queueStartBtn.disabled = !hasPending || isRunning || queue.some(item => item.probingAudio);
   queueStopBtn.disabled = !isRunning;
   queueClearBtn.disabled = isRunning;
   ipcRenderer.send('queue-running', isRunning);
@@ -393,7 +461,7 @@ queueStartBtn.addEventListener('click', startQueue);
 queueStopBtn.addEventListener('click', stopQueue);
 
 async function startQueue() {
-  if (isRunning) return;
+  if (isRunning || queue.some(item => item.probingAudio)) return;
   isRunning = true;
   stopRequested = false;
   updateButtons();
@@ -434,6 +502,11 @@ async function startQueue() {
       device: document.getElementById('device-select').value,
       language: document.getElementById('language-select').value,
       translate: document.getElementById('translate-select').value,
+      precision: document.getElementById('precision-select').value,
+      audioMix: document.getElementById('audio-mix-select').value,
+      audioStream: item.audioStream,
+      terms: document.getElementById('terms-input').value,
+      speechGuard: document.getElementById('speech-guard-select').value,
     };
 
     try {
@@ -571,10 +644,16 @@ cancelBtn.addEventListener('click', async () => {
 
 // ===== 다른 이름으로 저장 =====
 saveAsBtn.addEventListener('click', async () => {
-  const item = selectedItemId ? getQueueItem(selectedItemId) : null;
-  const content = item?.srtContent;
+  const content = srtPreview.textContent;
   if (!content) return;
   await ipcRenderer.invoke('save-srt-as', { content });
+});
+
+document.getElementById('original-toggle').addEventListener('click', () => {
+  const item = selectedItemId ? getQueueItem(selectedItemId) : null;
+  if (!item?.result?.original_srt_path) return;
+  item.showOriginal = !item.showOriginal;
+  showItemResult(item);
 });
 
 // ===== 새 작업 =====
@@ -588,6 +667,22 @@ newVideoBtn.addEventListener('click', () => {
 const APP_VERSION = require(path.join(__dirname, '..', 'package.json')).version;
 
 const CHANGELOG = [
+  {
+    version: '1.10.0',
+    date: '2026-10-29',
+    sections: [
+      { title: 'Fixed', type: 'fixed', items: [
+        '무음·숨소리·웃음의 잘못된 대사 억제: 불확실한 구간을 따로 재확인',
+        '강한 억제를 기본 적용하며, 불분명한 대사가 빠지면 설정에서 기본 강도로 변경 가능',
+        '일본어를 원어로 지정해 번역하고 이름·단어 사이 불필요한 공백 방지',
+      ] },
+      { title: 'Added', type: 'added', items: [
+        '일본어 영화 설정, 파일별 음성 트랙과 중앙 대사 채널 선택',
+        '이름·지명 힌트, 정밀 GPU 연산과 메모리 부족 시 자동 전환',
+        '번역 전 원문 자막 보존, 원문 보기와 별도 저장',
+      ] },
+    ],
+  },
   {
     version: '1.9.1',
     date: '2026-10-20',

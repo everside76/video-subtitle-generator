@@ -44,7 +44,7 @@ def _number(value):
     return isinstance(value, (int, float)) and isfinite(value)
 
 
-def unreliable_segment(segment):
+def unreliable_segment(segment, strict=False):
     """Use combined acoustic evidence, never a blacklist of spoken phrases.
 
     A high no-speech probability alone also occurs on real quiet speech;
@@ -53,11 +53,20 @@ def unreliable_segment(segment):
     logprob = segment.get("avg_logprob")
     no_speech = segment.get("no_speech_prob")
     compression = segment.get("compression_ratio")
+    if strict:
+        words = segment.get('words') or []
+        total = sum(sum(c.isalnum() for c in w.get('word', '')) for w in words)
+        placed = sum(sum(c.isalnum() for c in w.get('word', '')) for w in words
+                     if _number(w.get('start')) and _number(w.get('end'))
+                     and w['end'] > w['start'] >= 0)
+        # Do not turn a largely untimed hallucination into a plausible fragment.
+        if total and placed < total * .5:
+            return True
     if not _number(logprob):
         return False
     return (
-        (_number(no_speech) and no_speech >= 0.6 and logprob < -0.5)
-        or (_number(compression) and compression > 2.4 and logprob < -1.0)
+        (_number(no_speech) and no_speech >= 0.6 and logprob < (-0.2 if strict else -0.5))
+        or (_number(compression) and compression > 2.4 and logprob < (-0.5 if strict else -1.0))
     )
 
 
@@ -101,12 +110,12 @@ class SpeechTimeline:
         }
 
 
-def restore_speech_segments(segments, chunks):
+def restore_speech_segments(segments, chunks, strict=False):
     """Filter weak predictions and restore words to the video's time axis."""
     timeline = SpeechTimeline(chunks)
     restored = []
     for segment in segments:
-        if unreliable_segment(segment):
+        if unreliable_segment(segment, strict):
             continue
         if "words" not in segment:
             # Without words, text cannot be assigned safely across two regions.

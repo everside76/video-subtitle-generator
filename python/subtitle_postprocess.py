@@ -97,8 +97,36 @@ def enforce_limits(groups, max_duration=MAX_DURATION,
 
 
 def join_words(words, lang):
+    if lang not in NOSPACE_LANGS and any(w["word"][:1].isspace() for w in words):
+        # Whisper encodes word boundaries as leading spaces. Do not insert a
+        # space into contractions, hyphenated names, or attached punctuation.
+        return "".join(w["word"] for w in words).strip()
     sep = "" if lang in NOSPACE_LANGS else " "
     return sep.join(w["word"].strip() for w in words).strip()
+
+
+def split_for_readability(groups, lang):
+    """Split on timed word boundaries before wrapping can overflow two lines."""
+    max_len = MAX_LINE_CJK if lang in CJK_LANGS else MAX_LINE_LATIN
+    result = []
+    for group in groups:
+        current = []
+        for word in group:
+            while current:
+                wrapped = wrap_lines(join_words(current + [word], lang), lang)
+                if all(len(line) <= max_len for line in wrapped.split("\n")):
+                    break
+                # Prefer complete clauses over a mid-sentence character cutoff,
+                # especially before Japanese text goes to translation.
+                boundaries = [i + 1 for i, token in enumerate(current)
+                              if token['word'].rstrip().endswith(('。', '！', '？', '!', '?', '、'))]
+                cut = boundaries[-1] if boundaries else len(current)
+                result.append(current[:cut])
+                current = current[cut:]
+            current.append(word)
+        if current:
+            result.append(current)
+    return result
 
 
 def wrap_lines(text, lang, max_lines=MAX_LINES):
@@ -160,7 +188,7 @@ def postprocess(segments, lang):
 
     subs = []
     all_words.sort(key=lambda w: (w["start"], w["end"]))
-    groups = enforce_limits(split_at_gaps(all_words))
+    groups = split_for_readability(enforce_limits(split_at_gaps(all_words)), lang)
     for i, g in enumerate(groups):
         start, end = g[0]["start"], g[-1]["end"]
         if end - start < MIN_DURATION:

@@ -45,7 +45,15 @@ function processVideo(videoPath, options, onProgress, onComplete, onError) {
     '--ffmpeg', getFfmpegPath(),
     '--device', options.device || 'auto',
     '--language', options.language || 'auto',
+    '--precision', options.precision || 'accurate',
+    '--audio-stream', String(options.audioStream ?? 'auto'),
+    '--audio-mix', options.audioMix || 'full',
+    '--speech-guard', options.speechGuard || 'strict',
   ];
+
+  if (typeof options.terms === 'string' && options.terms.trim()) {
+    args.push('--terms', options.terms.slice(0, 300));
+  }
 
   if (options.output) {
     args.push('--output', options.output);
@@ -140,7 +148,8 @@ async function finishWithTranslation(result, options, onProgress, onComplete) {
           stage: 'generating', progress: 99,
           message: `한국어 번역 중... (${done}/${total})`,
         });
-      });
+      }, result.language);
+      result.original_srt_path = stats.originalPath;
       if (stats.failed > 0) {
         onProgress({
           stage: 'warning', progress: 99,
