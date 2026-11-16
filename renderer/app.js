@@ -65,6 +65,8 @@ const ENGINE_DEFAULT_MODEL = {
   'openai-whisper': 'large-v3',
 };
 
+const sessionModels = {};
+
 // 엔진에 맞춰 모델 목록 동기화
 function syncEngineUI() {
   const engine = document.getElementById('engine-select').value;
@@ -72,7 +74,7 @@ function syncEngineUI() {
   const modelSel = document.getElementById('model-select');
   const models = ENGINE_MODELS[engine] || ENGINE_MODELS['faster-whisper'];
 
-  const saved = localStorage.getItem('setting:model-select@' + engine);
+  const saved = sessionModels[engine] || localStorage.getItem('setting:model-select@' + engine);
   modelSel.innerHTML = '';
   for (const [value, label] of models) {
     const opt = document.createElement('option');
@@ -119,7 +121,7 @@ function loadSettings() {
       localStorage.setItem('setting:' + id, el.value);
     }
     el.addEventListener('change', () => {
-      localStorage.setItem('setting:' + id, el.value);
+      document.getElementById('defaults-status').textContent = '이번 작업에 적용됩니다. 다음에도 쓰려면 기본값으로 저장하세요.';
       if (id === 'engine-select') syncEngineUI();
     });
   });
@@ -129,29 +131,30 @@ function loadSettings() {
 
   const termsInput = document.getElementById('terms-input');
   termsInput.value = (localStorage.getItem('setting:terms') || '').slice(0, 300);
-  termsInput.addEventListener('input', () => localStorage.setItem('setting:terms', termsInput.value));
+  termsInput.addEventListener('input', () => { document.getElementById('defaults-status').textContent = '변경한 설정은 아직 기본값으로 저장하지 않았습니다.'; });
 
   // 모델은 엔진별로 저장
   document.getElementById('model-select').addEventListener('change', () => {
     const engine = document.getElementById('engine-select').value;
-    localStorage.setItem('setting:model-select@' + engine,
-      document.getElementById('model-select').value);
+    sessionModels[engine] = document.getElementById('model-select').value;
+    document.getElementById('defaults-status').textContent = '변경한 설정은 아직 기본값으로 저장하지 않았습니다.';
   });
 }
 loadSettings();
 
-document.getElementById('movie-preset').addEventListener('click', () => {
-  for (const [id, value] of Object.entries({
-    'engine-select': 'faster-whisper', 'device-select': 'auto',
-    'language-select': 'ja',
-    'precision-select': 'accurate', 'audio-mix-select': 'full',
-    'speech-guard-select': 'strict',
-  })) {
-    document.getElementById(id).value = value;
-    localStorage.setItem('setting:' + id, value);
+document.getElementById('save-defaults').addEventListener('click', () => {
+  try {
+    SETTING_IDS.forEach(id => localStorage.setItem('setting:' + id, document.getElementById(id).value));
+    const engine = document.getElementById('engine-select').value;
+    sessionModels[engine] = document.getElementById('model-select').value;
+    for (const [name, model] of Object.entries(sessionModels)) {
+      localStorage.setItem('setting:model-select@' + name, model);
+    }
+    localStorage.setItem('setting:terms', document.getElementById('terms-input').value);
+    document.getElementById('defaults-status').textContent = '기본값을 저장했습니다. 다음 실행부터 자동으로 불러옵니다.';
+  } catch {
+    document.getElementById('defaults-status').textContent = '기본값을 저장하지 못했습니다. 다시 시도해 주세요.';
   }
-  localStorage.setItem('setting:model-select@faster-whisper', 'large-v3');
-  syncEngineUI();
 });
 
 // ===== 설정 토글 =====
@@ -653,6 +656,9 @@ newVideoBtn.addEventListener('click', () => {
 const APP_VERSION = require(path.join(__dirname, '..', 'package.json')).version;
 
 const CHANGELOG = [
+  { version: '1.12.0', date: '2026-11-16', sections: [
+    { title: 'Changed', type: 'changed', items: ['언어를 직접 선택하고 현재 설정을 기본값으로 저장', '저장한 기본값을 다음 실행에 복원하고 임시 변경은 저장 전까지 유지', '일본어 고정 프리셋 제거'] },
+  ] },
   {
     version: '1.11.0',
     date: '2026-11-16',

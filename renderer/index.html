@@ -33,7 +33,8 @@
 
   <!-- Settings -->
   <div id="settings-panel">
-    <button id="movie-preset" type="button">일본어 영화 설정</button>
+    <button id="save-defaults" type="button">기본값으로 저장</button>
+    <span id="defaults-status" role="status" aria-live="polite">언어와 설정을 선택한 뒤 기본값으로 저장하세요.</span>
     <label>
       음성 인식 엔진:
       <select id="engine-select">
@@ -87,7 +88,7 @@
     </label>
     <label class="terms-label" for="terms-input">
       이름·지명·전문용어 (선택)
-      <input id="terms-input" type="text" maxlength="300" placeholder="예: 綾瀬、黒崎、新宿 — 실제 등장하는 이름을 일본어로" autocomplete="off">
+      <input id="terms-input" type="text" maxlength="300" placeholder="예: 등장인물 이름, 지명 — 영상의 원어로 입력" autocomplete="off">
     </label>
     <label>
       무음·효과음 억제:

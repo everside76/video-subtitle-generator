@@ -134,7 +134,7 @@ body {
   color: #e0e0e0;
 }
 .settings-help { width: 100%; font-size: 11px; color: #a0b4d0; line-height: 1.6; }
-#movie-preset { padding: 6px 10px; border: 1px solid #21cbf3; border-radius: 4px; background: #1a1a2e; color: #21cbf3; cursor: pointer; }
+#save-defaults { padding: 6px 10px; border: 1px solid #21cbf3; border-radius: 4px; background: #1a1a2e; color: #21cbf3; cursor: pointer; }
 .audio-track-select { width: 100%; margin-top: 6px; background: #16213e; color: #e0e0e0; border: 1px solid #536681; border-radius: 3px; font-size: 11px; padding: 4px; }
 .audio-track-note { margin-top: 5px; font-size: 11px; color: #a0b4d0; white-space: normal; }
 
@@ -837,3 +837,5 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #1a4a8a;
 }
+
+#defaults-status { width: 100%; font-size: 12px; color: #a0b4d0; }
