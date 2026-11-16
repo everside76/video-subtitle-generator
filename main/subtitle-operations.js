@@ -2,7 +2,6 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const engineManager = require('./engine-manager');
-const translator = require('./translator');
 
 let currentProcess = null;
 
@@ -92,7 +91,7 @@ function processVideo(videoPath, options, onProgress, onComplete, onError) {
           if (failed || completed) continue;
           completed = true;
           currentProcess = null;
-          finishWithTranslation(msg.result, options, onProgress, onComplete);
+          onComplete(msg.result);
         } else if (msg.stage === 'error') {
           fail(new Error(msg.message));
         } else {
@@ -135,35 +134,6 @@ function processVideo(videoPath, options, onProgress, onComplete, onError) {
   });
 
   return proc;
-}
-
-/** 외국어 음성이면 SRT를 한국어로 번역한 뒤 완료 처리 */
-async function finishWithTranslation(result, options, onProgress, onComplete) {
-  const mode = options.translate || 'ko'; // 'ko' | 'both' | 'off'
-  if (mode !== 'off' && result && result.language && result.language !== 'ko') {
-    try {
-      onProgress({ stage: 'generating', progress: 99, message: '한국어 번역 중...' });
-      const stats = await translator.translateSrtFile(result.srt_path, mode, (done, total) => {
-        onProgress({
-          stage: 'generating', progress: 99,
-          message: `한국어 번역 중... (${done}/${total})`,
-        });
-      }, result.language);
-      result.original_srt_path = stats.originalPath;
-      if (stats.failed > 0) {
-        onProgress({
-          stage: 'warning', progress: 99,
-          message: `번역 ${stats.failed}건 실패 — 해당 자막은 원문 유지`,
-        });
-      }
-    } catch (err) {
-      onProgress({
-        stage: 'warning', progress: 99,
-        message: '번역 실패(' + err.message + ') — 원문 자막으로 저장됨',
-      });
-    }
-  }
-  onComplete(result);
 }
 
 function cancelProcessing() {

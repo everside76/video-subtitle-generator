@@ -56,7 +56,7 @@ test('retains download progress and ready status for renderer reloads', async ()
   assert.equal(f.controller.getStatus().state, 'ready');
 });
 
-test('does not restart while transcription, translation, queue or engine is busy', () => {
+test('does not restart while transcription, queue or engine is busy', () => {
   let busy = true;
   const f = fixture({ isBusy: () => busy });
   f.updater.emit('update-downloaded', { version: '1.9.0' });

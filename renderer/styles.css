@@ -612,13 +612,13 @@ body {
   background: #1976d2;
 }
 
-#new-video-btn, #original-toggle {
+#new-video-btn {
   background: transparent;
   border: 1px solid #0f3460;
   color: #a0b4d0;
 }
 
-#new-video-btn:hover, #original-toggle:hover {
+#new-video-btn:hover {
   background: #0f3460;
   color: #e0e0e0;
 }

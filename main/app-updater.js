@@ -57,7 +57,7 @@ function createAppUpdater({ updater, packaged, notify = () => {}, isBusy = () =>
       return { ok: false, message: '다운로드된 업데이트가 없습니다.' };
     }
     if (isBusy()) {
-      return { ok: false, message: '자막 생성·번역 또는 엔진 설치가 끝난 뒤 다시 눌러 주세요.' };
+      return { ok: false, message: '자막 생성 또는 엔진 설치가 끝난 뒤 다시 눌러 주세요.' };
     }
     publish({ ...status, state: 'installing' });
     try {

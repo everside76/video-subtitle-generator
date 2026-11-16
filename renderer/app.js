@@ -40,7 +40,7 @@ let currentProcessingId = null;
 let appUpdateStatus = { state: 'idle' };
 
 // ===== 설정 영속화 =====
-const SETTING_IDS = ['engine-select', 'device-select', 'language-select', 'translate-select',
+const SETTING_IDS = ['engine-select', 'device-select', 'language-select',
   'precision-select', 'audio-mix-select', 'speech-guard-select'];
 
 // 모델 목록은 엔진마다 다르므로 별도 관리 (설정도 엔진별로 저장)
@@ -100,6 +100,7 @@ function migrateModelSetting() {
 }
 
 function loadSettings() {
+  localStorage.removeItem('setting:translate-select');
   // Retired engine settings must not select an unavailable runtime after update.
   localStorage.removeItem('setting:cw-mode-select');
   for (const key of Object.keys(localStorage)) {
@@ -142,7 +143,7 @@ loadSettings();
 document.getElementById('movie-preset').addEventListener('click', () => {
   for (const [id, value] of Object.entries({
     'engine-select': 'faster-whisper', 'device-select': 'auto',
-    'language-select': 'ja', 'translate-select': 'ko',
+    'language-select': 'ja',
     'precision-select': 'accurate', 'audio-mix-select': 'full',
     'speech-guard-select': 'strict',
   })) {
@@ -374,14 +375,7 @@ function showItemResult(item) {
   const track = item.result.audio_track;
   document.getElementById('res-audio-track').textContent = track
     ? `트랙 ${track.index} · ${track.mix === 'center' ? '중앙 채널' : '전체 음성'}` : '-';
-  const originalToggle = document.getElementById('original-toggle');
-  originalToggle.hidden = !item.result.original_srt_path;
-  originalToggle.textContent = item.showOriginal ? '번역 보기' : '원문 보기';
-
-  if (item.showOriginal) {
-    try { srtPreview.textContent = fs.readFileSync(item.result.original_srt_path, 'utf8'); }
-    catch { item.showOriginal = false; originalToggle.textContent = '원문 보기'; srtPreview.textContent = item.srtContent || ''; }
-  } else { srtPreview.textContent = item.srtContent || ''; }
+  srtPreview.textContent = item.srtContent || '';
   showView('result');
 }
 
@@ -501,7 +495,6 @@ async function startQueue() {
       model: document.getElementById('model-select').value,
       device: document.getElementById('device-select').value,
       language: document.getElementById('language-select').value,
-      translate: document.getElementById('translate-select').value,
       precision: document.getElementById('precision-select').value,
       audioMix: document.getElementById('audio-mix-select').value,
       audioStream: item.audioStream,
@@ -649,13 +642,6 @@ saveAsBtn.addEventListener('click', async () => {
   await ipcRenderer.invoke('save-srt-as', { content });
 });
 
-document.getElementById('original-toggle').addEventListener('click', () => {
-  const item = selectedItemId ? getQueueItem(selectedItemId) : null;
-  if (!item?.result?.original_srt_path) return;
-  item.showOriginal = !item.showOriginal;
-  showItemResult(item);
-});
-
 // ===== 새 작업 =====
 newVideoBtn.addEventListener('click', () => {
   selectedItemId = null;
@@ -667,6 +653,17 @@ newVideoBtn.addEventListener('click', () => {
 const APP_VERSION = require(path.join(__dirname, '..', 'package.json')).version;
 
 const CHANGELOG = [
+  {
+    version: '1.11.0',
+    date: '2026-11-16',
+    sections: [
+      { title: 'Changed', type: 'changed', items: [
+        '번역 기능과 설정, 외부 번역 서버 연결 제거',
+        '영상에서 말하는 언어로 자막 생성·미리보기·저장',
+        '일본어 영화 설정, 음성 트랙 선택과 무음·효과음 억제 유지',
+      ] },
+    ],
+  },
   {
     version: '1.10.0',
     date: '2026-10-29',

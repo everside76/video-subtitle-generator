@@ -117,7 +117,7 @@ def split_for_readability(groups, lang):
                 if all(len(line) <= max_len for line in wrapped.split("\n")):
                     break
                 # Prefer complete clauses over a mid-sentence character cutoff,
-                # especially before Japanese text goes to translation.
+                # especially for readable Japanese subtitles.
                 boundaries = [i + 1 for i, token in enumerate(current)
                               if token['word'].rstrip().endswith(('。', '！', '？', '!', '?', '、'))]
                 cut = boundaries[-1] if boundaries else len(current)
